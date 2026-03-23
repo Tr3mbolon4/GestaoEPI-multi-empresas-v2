@@ -20,11 +20,25 @@ class PyObjectId(str):
 
 # Novos perfis de acesso
 class UserRole(str, Enum):
-    ADMIN = "admin"              # Administrador - acesso total
-    GESTOR = "gestor"            # Gestor - acesso operacional total
-    RH = "rh"                    # RH - colaboradores, empresas, usuários
+    SUPER_ADMIN = "super_admin"    # NOVO: Dono do sistema - acesso a TODAS empresas
+    ADMIN = "admin"               # Administrador da empresa
+    GESTOR = "gestor"             # Gestor - acesso operacional total
+    RH = "rh"                     # RH - colaboradores, empresas, usuários
     SEGURANCA_TRABALHO = "seguranca_trabalho"  # Seg. Trabalho - EPIs, fornecedores
     ALMOXARIFADO = "almoxarifado"  # Almoxarifado - entregas, movimentação
+
+# Status da empresa no sistema
+class EmpresaStatus(str, Enum):
+    ATIVO = "ativo"
+    BLOQUEADO = "bloqueado"
+
+# Planos disponíveis (limite de colaboradores)
+class EmpresaPlano(str, Enum):
+    STARTER = "50"      # 50 colaboradores
+    BASIC = "150"       # 150 colaboradores
+    PROFESSIONAL = "250"  # 250 colaboradores
+    ENTERPRISE = "350"   # 350 colaboradores
+    UNLIMITED = "unlimited"  # Sem limite
 
 class EmployeeStatus(str, Enum):
     ACTIVE = "active"
@@ -50,7 +64,9 @@ class TokenResponse(BaseModel):
     must_change_password: bool
     password_expired: bool = False
     role: UserRole
-    is_primary_admin: bool = False  # True apenas para o admin principal
+    is_primary_admin: bool = False
+    empresa_id: Optional[str] = None  # NOVO: ID da empresa do usuário
+    empresa_nome: Optional[str] = None  # NOVO: Nome da empresa
 
 class LoginRequest(BaseModel):
     username: str
@@ -75,6 +91,44 @@ class ChangePasswordRequest(BaseModel):
             raise ValueError('A senha deve conter pelo menos um caractere especial (!@#$%^&*)')
         return v
 
+# ===================== EMPRESA (TENANT) =====================
+
+class EmpresaCreate(BaseModel):
+    nome: str
+    cnpj: str
+    status: EmpresaStatus = EmpresaStatus.ATIVO
+    plano: EmpresaPlano = EmpresaPlano.STARTER
+    limite_colaboradores: int = 50
+    endereco: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+    responsavel: Optional[str] = None
+
+class EmpresaUpdate(BaseModel):
+    nome: Optional[str] = None
+    cnpj: Optional[str] = None
+    status: Optional[EmpresaStatus] = None
+    plano: Optional[EmpresaPlano] = None
+    limite_colaboradores: Optional[int] = None
+    endereco: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+    responsavel: Optional[str] = None
+
+class EmpresaResponse(BaseModel):
+    id: str
+    nome: str
+    cnpj: str
+    status: EmpresaStatus
+    plano: EmpresaPlano
+    limite_colaboradores: int
+    colaboradores_cadastrados: int = 0
+    endereco: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+    responsavel: Optional[str] = None
+    created_at: datetime
+
 # ===================== USER =====================
 
 class UserCreate(BaseModel):
@@ -82,6 +136,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: UserRole = UserRole.ALMOXARIFADO
+    empresa_id: Optional[str] = None  # NOVO: obrigatório para não-SUPER_ADMIN
     employee_id: Optional[str] = None
     
     @field_validator('password')
@@ -103,6 +158,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    empresa_id: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str
@@ -110,10 +166,12 @@ class UserResponse(BaseModel):
     email: str
     role: UserRole
     is_active: bool
-    is_primary_admin: bool = False  # True apenas para o admin principal
+    is_primary_admin: bool = False
     must_change_password: bool
     password_changed_at: Optional[datetime] = None
     employee_id: Optional[str] = None
+    empresa_id: Optional[str] = None  # NOVO
+    empresa_nome: Optional[str] = None  # NOVO
     created_at: datetime
 
 class UserInDB(BaseModel):

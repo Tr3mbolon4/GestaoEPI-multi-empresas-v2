@@ -317,7 +317,7 @@ export default function EPIs() {
           </div>
           
           <p style="margin-top: 40px; font-size: 11px; color: #999; text-align: center;">
-            Documento gerado em: ${new Date().toLocaleString('pt-BR')} | Sistema Cipolatti - Gestão de EPI
+            Documento gerado em: ${new Date().toLocaleString('pt-BR')} | GestorEPI - Sistema de Gestão de EPI
           </p>
         </body>
       </html>

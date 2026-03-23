@@ -39,7 +39,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Dias para expiração de senha
 PASSWORD_EXPIRY_DAYS = 30
 
-app = FastAPI(title='Cipolatti API')
+app = FastAPI(title='GestorEPI API')
 api_router = APIRouter(prefix='/api')
 
 app.add_middleware(
@@ -131,7 +131,7 @@ def can_manage_employees(role):
 
 @api_router.get('/')
 async def root():
-    return {'message': 'Cipolatti API'}
+    return {'message': 'GestorEPI API'}
 
 @api_router.get('/health')
 async def health_check():
@@ -182,13 +182,27 @@ async def login(request: LoginRequest):
     if not user.get('is_active', True):
         raise HTTPException(status_code=400, detail='Usuário inativo')
     
+    # MULTI-TENANT: Verificar empresa do usuário
+    empresa_id = user.get('empresa_id')
+    empresa_nome = None
+    
+    if empresa_id and user.get('role') != 'super_admin':
+        empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+        if empresa:
+            if empresa.get('status') == 'bloqueado':
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail='Empresa bloqueada. Entre em contato com o administrador.'
+                )
+            empresa_nome = empresa.get('nome')
+    
     license_doc = await db.panel_license.find_one({})
     if license_doc:
         now = datetime.now(timezone.utc)
         expires_at = license_doc['expires_at']
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if now > expires_at and user['role'] != 'admin':
+        if now > expires_at and user['role'] not in ['admin', 'super_admin']:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Licença expirada')
     
     password_expired = check_password_expired(user)
@@ -201,7 +215,9 @@ async def login(request: LoginRequest):
         must_change_password=user.get('must_change_password', False),
         password_expired=password_expired,
         role=UserRole(user['role']),
-        is_primary_admin=user.get('is_primary_admin', False)
+        is_primary_admin=user.get('is_primary_admin', False),
+        empresa_id=empresa_id,
+        empresa_nome=empresa_nome
     )
 
 @api_router.post('/auth/change-password')
@@ -231,16 +247,229 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         must_change_password=current_user.get('must_change_password', False),
         password_changed_at=current_user.get('password_changed_at'),
         employee_id=current_user.get('employee_id'),
+        empresa_id=current_user.get('empresa_id'),
+        empresa_nome=current_user.get('empresa_nome'),
         created_at=current_user.get('created_at', datetime.now(timezone.utc))
     )
+
+# ===================== EMPRESAS (MULTI-TENANT) - SUPER_ADMIN =====================
+
+@api_router.get('/empresas', response_model=List[EmpresaResponse])
+async def get_empresas(current_user: dict = Depends(require_super_admin())):
+    """Lista todas as empresas (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    empresas = await db.empresas.find({}).to_list(1000)
+    
+    result = []
+    for emp in empresas:
+        # Contar colaboradores
+        colab_count = await db.employees.count_documents({"empresa_id": str(emp['_id'])})
+        resp = doc_to_response(emp)
+        resp['colaboradores_cadastrados'] = colab_count
+        result.append(EmpresaResponse(**resp))
+    
+    return result
+
+@api_router.post('/empresas', response_model=EmpresaResponse, status_code=status.HTTP_201_CREATED)
+async def create_empresa(empresa_data: EmpresaCreate, current_user: dict = Depends(require_super_admin())):
+    """Cria nova empresa (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    
+    # Verificar CNPJ único
+    existing = await db.empresas.find_one({"cnpj": empresa_data.cnpj})
+    if existing:
+        raise HTTPException(status_code=400, detail='CNPJ já cadastrado')
+    
+    # Definir limite baseado no plano
+    plano_limites = {
+        "50": 50, "150": 150, "250": 250, "350": 350, "unlimited": 999999
+    }
+    limite = plano_limites.get(empresa_data.plano.value, 50)
+    
+    new_empresa = {
+        "nome": empresa_data.nome,
+        "cnpj": empresa_data.cnpj,
+        "status": empresa_data.status.value,
+        "plano": empresa_data.plano.value,
+        "limite_colaboradores": empresa_data.limite_colaboradores or limite,
+        "endereco": empresa_data.endereco,
+        "telefone": empresa_data.telefone,
+        "email": empresa_data.email,
+        "responsavel": empresa_data.responsavel,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc)
+    }
+    
+    result = await db.empresas.insert_one(new_empresa)
+    new_empresa['_id'] = result.inserted_id
+    
+    resp = doc_to_response(new_empresa)
+    resp['colaboradores_cadastrados'] = 0
+    return EmpresaResponse(**resp)
+
+@api_router.get('/empresas/{empresa_id}', response_model=EmpresaResponse)
+async def get_empresa(empresa_id: str, current_user: dict = Depends(require_super_admin())):
+    """Busca empresa por ID (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail='Empresa não encontrada')
+    
+    colab_count = await db.employees.count_documents({"empresa_id": empresa_id})
+    resp = doc_to_response(empresa)
+    resp['colaboradores_cadastrados'] = colab_count
+    return EmpresaResponse(**resp)
+
+@api_router.patch('/empresas/{empresa_id}', response_model=EmpresaResponse)
+async def update_empresa(empresa_id: str, empresa_data: EmpresaUpdate, current_user: dict = Depends(require_super_admin())):
+    """Atualiza empresa (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    
+    update_data = {k: v for k, v in empresa_data.model_dump(exclude_unset=True).items() if v is not None}
+    
+    # Converter enums para string
+    if 'status' in update_data:
+        update_data['status'] = update_data['status'].value
+    if 'plano' in update_data:
+        update_data['plano'] = update_data['plano'].value
+    
+    update_data['updated_at'] = datetime.now(timezone.utc)
+    
+    result = await db.empresas.find_one_and_update(
+        {"_id": ObjectId(empresa_id)},
+        {"$set": update_data},
+        return_document=True
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail='Empresa não encontrada')
+    
+    colab_count = await db.employees.count_documents({"empresa_id": empresa_id})
+    resp = doc_to_response(result)
+    resp['colaboradores_cadastrados'] = colab_count
+    return EmpresaResponse(**resp)
+
+@api_router.post('/empresas/{empresa_id}/bloquear')
+async def bloquear_empresa(empresa_id: str, current_user: dict = Depends(require_super_admin())):
+    """Bloqueia uma empresa (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    
+    result = await db.empresas.find_one_and_update(
+        {"_id": ObjectId(empresa_id)},
+        {"$set": {"status": "bloqueado", "updated_at": datetime.now(timezone.utc)}},
+        return_document=True
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail='Empresa não encontrada')
+    
+    return {'message': f'Empresa {result["nome"]} bloqueada com sucesso'}
+
+@api_router.post('/empresas/{empresa_id}/ativar')
+async def ativar_empresa(empresa_id: str, current_user: dict = Depends(require_super_admin())):
+    """Ativa uma empresa bloqueada (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    
+    result = await db.empresas.find_one_and_update(
+        {"_id": ObjectId(empresa_id)},
+        {"$set": {"status": "ativo", "updated_at": datetime.now(timezone.utc)}},
+        return_document=True
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail='Empresa não encontrada')
+    
+    return {'message': f'Empresa {result["nome"]} ativada com sucesso'}
+
+@api_router.post('/empresas/{empresa_id}/criar-admin')
+async def criar_admin_empresa(empresa_id: str, user_data: UserCreate, current_user: dict = Depends(require_super_admin())):
+    """Cria usuário admin para uma empresa (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    
+    # Verificar se empresa existe
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail='Empresa não encontrada')
+    
+    # Verificar se username/email já existe
+    email_normalized = user_data.email.lower().strip()
+    existing = await db.users.find_one({"$or": [
+        {"username": user_data.username},
+        {"email": email_normalized}
+    ]})
+    if existing:
+        raise HTTPException(status_code=400, detail='Usuário ou e-mail já existe')
+    
+    new_user = {
+        "username": user_data.username,
+        "email": email_normalized,
+        "hashed_password": get_password_hash(user_data.password),
+        "role": "admin",
+        "empresa_id": empresa_id,
+        "must_change_password": True,
+        "is_active": True,
+        "password_changed_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc)
+    }
+    
+    result = await db.users.insert_one(new_user)
+    new_user['_id'] = result.inserted_id
+    
+    resp = doc_to_response(new_user)
+    resp['empresa_nome'] = empresa['nome']
+    return UserResponse(**resp)
+
+@api_router.get('/empresas/{empresa_id}/stats')
+async def get_empresa_stats(empresa_id: str, current_user: dict = Depends(require_super_admin())):
+    """Estatísticas de uso de uma empresa (apenas SUPER_ADMIN)"""
+    db = await get_db()
+    
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail='Empresa não encontrada')
+    
+    # Contar registros
+    colaboradores = await db.employees.count_documents({"empresa_id": empresa_id})
+    usuarios = await db.users.count_documents({"empresa_id": empresa_id})
+    epis = await db.epis.count_documents({"empresa_id": empresa_id})
+    entregas = await db.deliveries.count_documents({"empresa_id": empresa_id})
+    kits = await db.kits.count_documents({"empresa_id": empresa_id})
+    
+    return {
+        'empresa_id': empresa_id,
+        'empresa_nome': empresa['nome'],
+        'plano': empresa.get('plano'),
+        'limite_colaboradores': empresa.get('limite_colaboradores'),
+        'colaboradores': colaboradores,
+        'usuarios': usuarios,
+        'epis': epis,
+        'entregas': entregas,
+        'kits': kits,
+        'uso_percentual': round((colaboradores / empresa.get('limite_colaboradores', 50)) * 100, 1) if empresa.get('limite_colaboradores') else 0
+    }
 
 # ===================== USERS =====================
 
 @api_router.get('/users', response_model=List[UserResponse])
 async def get_users(current_user: dict = Depends(require_role('admin', 'rh'))):
     db = await get_db()
-    users = await db.users.find({}).to_list(1000)
-    return [UserResponse(**doc_to_response(u)) for u in users]
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    users = await db.users.find(empresa_filter).to_list(1000)
+    
+    result = []
+    for u in users:
+        resp = doc_to_response(u)
+        # Buscar nome da empresa
+        if u.get('empresa_id'):
+            emp = await db.empresas.find_one({"_id": ObjectId(u['empresa_id'])})
+            resp['empresa_nome'] = emp['nome'] if emp else None
+        result.append(UserResponse(**resp))
+    
+    return result
 
 @api_router.post('/users', response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(user_data: UserCreate, current_user: dict = Depends(require_role('admin', 'rh'))):
@@ -263,12 +492,18 @@ async def create_user(user_data: UserCreate, current_user: dict = Depends(requir
         else:
             raise HTTPException(status_code=400, detail='E-mail já está em uso')
     
+    # MULTI-TENANT: Associar usuário à mesma empresa do criador
+    empresa_id = current_user.get('empresa_id')
+    if current_user.get('role') != 'super_admin' and not empresa_id:
+        raise HTTPException(status_code=400, detail='Usuário deve estar associado a uma empresa')
+    
     new_user = {
         "username": user_data.username,
         "email": email_normalized,
         "hashed_password": get_password_hash(user_data.password),
         "role": user_data.role.value,
         "employee_id": user_data.employee_id,
+        "empresa_id": empresa_id,  # MULTI-TENANT
         "must_change_password": True,
         "is_active": True,
         "password_changed_at": datetime.now(timezone.utc),
@@ -277,7 +512,10 @@ async def create_user(user_data: UserCreate, current_user: dict = Depends(requir
     }
     result = await db.users.insert_one(new_user)
     new_user['_id'] = result.inserted_id
-    return UserResponse(**doc_to_response(new_user))
+    
+    resp = doc_to_response(new_user)
+    resp['empresa_nome'] = current_user.get('empresa_nome')
+    return UserResponse(**resp)
 
 @api_router.patch('/users/{user_id}', response_model=UserResponse)
 async def update_user(user_id: str, user_data: UserUpdate, current_user: dict = Depends(require_role('admin'))):
@@ -397,7 +635,10 @@ async def delete_company(company_id: str, current_user: dict = Depends(require_r
 @api_router.get('/employees')
 async def get_employees(current_user: dict = Depends(get_current_user), search: Optional[str] = None, company_id: Optional[str] = None):
     db = await get_db()
-    query = {}
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = get_empresa_filter(current_user)
+    
     if search:
         query["$or"] = [
             {"full_name": {"$regex": search, "$options": "i"}},
@@ -421,11 +662,34 @@ async def create_employee(employee_data: EmployeeCreate, current_user: dict = De
         raise HTTPException(status_code=403, detail='Sem permissão para cadastrar colaboradores')
     
     db = await get_db()
-    existing = await db.employees.find_one({"cpf": employee_data.cpf})
-    if existing:
-        raise HTTPException(status_code=400, detail='CPF já cadastrado')
     
-    new_employee = {**employee_data.model_dump(), "created_at": datetime.now(timezone.utc), "updated_at": datetime.now(timezone.utc)}
+    # MULTI-TENANT: Verificar limite de colaboradores
+    empresa_id = current_user.get('empresa_id')
+    if empresa_id:
+        empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+        if empresa:
+            limite = empresa.get('limite_colaboradores', 50)
+            atual = await db.employees.count_documents({"empresa_id": empresa_id})
+            if atual >= limite:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f'Limite de colaboradores atingido ({atual}/{limite}). Atualize seu plano.'
+                )
+    
+    # Verificar CPF único na mesma empresa
+    cpf_query = {"cpf": employee_data.cpf}
+    if empresa_id:
+        cpf_query["empresa_id"] = empresa_id
+    existing = await db.employees.find_one(cpf_query)
+    if existing:
+        raise HTTPException(status_code=400, detail='CPF já cadastrado nesta empresa')
+    
+    new_employee = {
+        **employee_data.model_dump(), 
+        "empresa_id": empresa_id,  # MULTI-TENANT
+        "created_at": datetime.now(timezone.utc), 
+        "updated_at": datetime.now(timezone.utc)
+    }
     result = await db.employees.insert_one(new_employee)
     new_employee['_id'] = result.inserted_id
     return EmployeeResponse(**doc_to_response(new_employee))
@@ -433,7 +697,14 @@ async def create_employee(employee_data: EmployeeCreate, current_user: dict = De
 @api_router.get('/employees/{employee_id}')
 async def get_employee(employee_id: str, current_user: dict = Depends(get_current_user)):
     db = await get_db()
-    employee = await db.employees.find_one({"_id": ObjectId(employee_id)})
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(employee_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    employee = await db.employees.find_one(query)
     if not employee:
         raise HTTPException(status_code=404, detail='Colaborador não encontrado')
     
@@ -1315,7 +1586,10 @@ def calculate_epi_status(epi):
 @api_router.get('/epis', response_model=List[EPIResponse])
 async def get_epis(current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho', 'almoxarifado'))):
     db = await get_db()
-    epis = await db.epis.find({}).to_list(1000)
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = get_empresa_filter(current_user)
+    epis = await db.epis.find(query).to_list(1000)
     
     result = []
     for e in epis:
@@ -1335,7 +1609,16 @@ async def create_epi(epi_data: EPICreate, current_user: dict = Depends(require_r
     if not epi_data.ca_number and not epi_data.nbr_number:
         raise HTTPException(status_code=400, detail='É necessário informar o número do CA ou NBR')
     
-    new_epi = {**epi_data.model_dump(), "created_by": current_user['id'], "created_at": datetime.now(timezone.utc), "updated_at": datetime.now(timezone.utc)}
+    # MULTI-TENANT: Associar à empresa do usuário
+    empresa_id = current_user.get('empresa_id')
+    
+    new_epi = {
+        **epi_data.model_dump(), 
+        "empresa_id": empresa_id,  # MULTI-TENANT
+        "created_by": current_user['id'], 
+        "created_at": datetime.now(timezone.utc), 
+        "updated_at": datetime.now(timezone.utc)
+    }
     
     # Converter enum para string se necessário
     if new_epi.get('replacement_period'):
@@ -1352,7 +1635,14 @@ async def create_epi(epi_data: EPICreate, current_user: dict = Depends(require_r
 @api_router.get('/epis/{epi_id}', response_model=EPIResponse)
 async def get_epi(epi_id: str, current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho', 'almoxarifado'))):
     db = await get_db()
-    epi = await db.epis.find_one({"_id": ObjectId(epi_id)})
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(epi_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    epi = await db.epis.find_one(query)
     if not epi:
         raise HTTPException(status_code=404, detail='EPI não encontrado')
     stock_status, validity_status = calculate_epi_status(epi)
@@ -1393,12 +1683,17 @@ async def delete_epi(epi_id: str, current_user: dict = Depends(require_role('adm
 @api_router.get('/kits', response_model=List[KitResponse])
 async def get_kits(current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho', 'almoxarifado'))):
     db = await get_db()
-    kits = await db.kits.find({}).to_list(1000)
+    # MULTI-TENANT: Filtrar por empresa
+    query = get_empresa_filter(current_user)
+    kits = await db.kits.find(query).to_list(1000)
     return [KitResponse(**doc_to_response(k)) for k in kits]
 
 @api_router.post('/kits', response_model=KitResponse, status_code=status.HTTP_201_CREATED)
 async def create_kit(kit_data: KitCreate, current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho'))):
     db = await get_db()
+    
+    # MULTI-TENANT: Associar à empresa do usuário
+    empresa_id = current_user.get('empresa_id')
     
     # Buscar detalhes dos EPIs para armazenar nome e descrição
     items_with_details = []
@@ -1422,6 +1717,7 @@ async def create_kit(kit_data: KitCreate, current_user: dict = Depends(require_r
         "sector": kit_data.sector,
         "is_mandatory": kit_data.is_mandatory,
         "items": items_with_details,
+        "empresa_id": empresa_id,  # MULTI-TENANT
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc)
     }
@@ -1547,6 +1843,7 @@ async def create_delivery(delivery_data: DeliveryCreate, current_user: dict = De
         "items": items_list,
         "delivered_by": current_user['id'],
         "delivered_by_name": current_user['username'],
+        "empresa_id": current_user.get('empresa_id'),  # MULTI-TENANT
         "created_at": datetime.now(timezone.utc)
     }
     result = await db.deliveries.insert_one(new_delivery)
@@ -1589,7 +1886,10 @@ async def get_deliveries(
     end_date: Optional[str] = None
 ):
     db = await get_db()
-    query = {}
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = get_empresa_filter(current_user)
+    
     if employee_id:
         query['employee_id'] = employee_id
     
@@ -2078,7 +2378,7 @@ import secrets
 def generate_auth_code(employee_id: str, timestamp: datetime) -> str:
     """Gera código de autenticação único para ficha de EPI"""
     # Criar hash baseado em employee_id, timestamp e secret
-    secret_key = os.environ.get('SECRET_KEY', 'cipolatti-secret-key-2026')
+    secret_key = os.environ.get('SECRET_KEY', 'gestorepi-secret-key-2026')
     data = f"{employee_id}:{timestamp.isoformat()}:{secret_key}:{secrets.token_hex(4)}"
     hash_obj = hashlib.sha256(data.encode())
     hash_hex = hash_obj.hexdigest()[:10].upper()

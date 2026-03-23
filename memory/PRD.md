@@ -1,99 +1,86 @@
-# PRD - GestaoEPI v5.1.0
+# PRD - GestorEPI v5.2.0
 
-## Sistema de Gestão de Equipamentos de Proteção Individual
+## Sistema de Gestão de Equipamentos de Proteção Individual - Multi-Tenant
 
 ### Original Problem Statement
-Sistema de gestão de EPIs com melhorias solicitadas:
-1. Kits por setor com vínculo obrigatório
-2. Alertas de EPI obrigatório não entregue
-3. Controle de periodicidade de troca de EPI  
-4. Campo NBR no cadastro de EPI
-5. Exibir responsável pela entrega no relatório
+Sistema de gestão de EPIs com arquitetura multiempresa (SaaS):
+1. Renomear de "Cipolatti" para "GestorEPI"
+2. Arquitetura Multi-Tenant com isolamento de dados
+3. Painel Master para SUPER_ADMIN
+4. Controle de planos e limites
+5. Kits por setor + Alertas + Periodicidade + NBR
 
 ### User Personas
-- **Administrador**: Gestão completa do sistema
-- **Gestor**: Gestão de EPIs e entregas
+- **SUPER_ADMIN**: Dono do sistema - gerencia todas as empresas
+- **Admin**: Administrador de uma empresa específica
+- **Gestor**: Gestão de EPIs e entregas na empresa
 - **RH**: Cadastro de colaboradores e empresas
 - **Segurança do Trabalho**: Monitoramento de conformidade
 - **Almoxarifado**: Operação de entregas
 
-### Core Requirements (Static)
-- Entrega de EPI via reconhecimento facial
-- Controle de estoque de EPIs
-- Gestão de colaboradores e empresas
-- Relatórios e fichas de EPI
-- Kits de EPI por setor
-
 ### What's Been Implemented (2026-03-23)
 
-#### 1. Campo NBR no Cadastro de EPI
-- Adicionado campo `nbr_number` no schema EPI
-- Validação: obrigatório ter CA ou NBR (ou ambos)
-- Exibição na tabela de EPIs e kits
+#### Fase 1: Renomear para GestorEPI
+- ✅ Removido todas as referências a "Cipolatti"
+- ✅ Atualizado título, logos e textos para "GestorEPI"
+- ✅ Removido badge "Made with Emergent"
 
-#### 2. Periodicidade de Troca de EPI
-- Campo `replacement_period`: weekly, biweekly, monthly, custom
-- Campo `replacement_days` para período personalizado
-- Alertas automáticos de troca vencida
+#### Fase 2: Arquitetura Multi-Tenant
+- ✅ Criado perfil SUPER_ADMIN (dono do sistema)
+- ✅ Criada coleção `empresas` com: nome, CNPJ, status, plano, limite
+- ✅ Adicionado `empresa_id` em: users, employees, epis, kits, deliveries
+- ✅ Filtros de isolamento em todos os endpoints
+- ✅ Verificação de limite de colaboradores por plano
+- ✅ Bloqueio de empresas (status = bloqueado)
 
-#### 3. Kits por Setor Obrigatório
-- Campo `sector` obrigatório no Kit
-- Flag `is_mandatory` para kits obrigatórios do setor
-- Associação automática colaborador → kit do setor
+#### Painel Master (SUPER_ADMIN)
+- ✅ Página `/painel-master` com gestão de empresas
+- ✅ Criar/Editar/Bloquear/Ativar empresas
+- ✅ Definir planos: Starter(50), Basic(150), Professional(250), Enterprise(350), Unlimited
+- ✅ Criar administrador para cada empresa
+- ✅ Visualizar estatísticas de uso por empresa
 
-#### 4. Sistema de Alertas
-- Nova página `/alertas` com central de alertas
-- Endpoint `/api/alerts/all` consolidado
-- Endpoint `/api/alerts/pending-epis` - EPIs obrigatórios pendentes
-- Endpoint `/api/alerts/replacement-due` - Trocas vencidas
-- Endpoint `/api/alerts/employee/{id}` - Alertas por colaborador
-- Card de alertas no Dashboard
-- Alertas na ficha do colaborador
+### Credenciais de Acesso
 
-#### 5. Responsável pela Entrega
-- Campo `delivered_by_name` salvo em cada entrega
-- Exibido no histórico de entregas
-- Incluído no relatório PDF do colaborador
+**SUPER_ADMIN (Painel Master):**
+- Usuário: `superadmin`
+- Senha: `Super@2026!`
+
+**Admin Empresa Demo:**
+- Usuário: `admin`
+- Senha: `Admin@2026!`
 
 ### Tech Stack
 - **Frontend**: React 18, TailwindCSS, shadcn/ui
 - **Backend**: FastAPI, Python 3.11
-- **Database**: MongoDB
-- **Biometria**: face-api.js (reconhecimento facial)
+- **Database**: MongoDB (Multi-Tenant)
+- **Biometria**: face-api.js
 
-### API Endpoints Implementados
+### API Endpoints Novos
 ```
-GET  /api/alerts/all
-GET  /api/alerts/pending-epis
-GET  /api/alerts/replacement-due  
-GET  /api/alerts/employee/{id}
-GET  /api/kits/by-sector/{sector}
-GET  /api/sectors/list
+# Empresas (SUPER_ADMIN)
+GET  /api/empresas
+POST /api/empresas
+GET  /api/empresas/{id}
+PATCH /api/empresas/{id}
+POST /api/empresas/{id}/bloquear
+POST /api/empresas/{id}/ativar
+POST /api/empresas/{id}/criar-admin
+GET  /api/empresas/{id}/stats
 ```
 
 ### Prioritized Backlog
 
-#### P0 - Crítico
-- [x] Alertas de EPIs pendentes
-- [x] Campo NBR
-- [x] Periodicidade de troca
+#### P0 - Concluído
+- [x] Fase 1: Renomear para GestorEPI
+- [x] Fase 2: Multi-Tenant básico
 
-#### P1 - Alta Prioridade
-- [x] Kits obrigatórios por setor
-- [x] Responsável pela entrega
-- [ ] Notificações por email de alertas
+#### P1 - Próximas Fases
+- [ ] Fase 3: Painel Master completo (relatórios por empresa)
+- [ ] Fase 4: Controle de planos avançado
+- [ ] Fase 5: Notificações por email
 
-#### P2 - Média Prioridade
-- [ ] Dashboard de conformidade por setor
-- [ ] Relatório de alertas em PDF
-- [ ] Exportação de dados para Excel
-
-### Next Tasks
-1. Configurar notificações automáticas por email
-2. Criar dashboard de conformidade
-3. Implementar exportação de relatórios
-4. Adicionar filtros avançados na central de alertas
-
-### Test Results
-- Backend: 100% (16/16 testes passaram)
-- Frontend: 85% (funcional, login requer troca de senha)
+#### P2 - Backlog
+- [ ] Backup automático diário
+- [ ] Dashboard de conformidade LGPD
+- [ ] Exportação de dados por empresa

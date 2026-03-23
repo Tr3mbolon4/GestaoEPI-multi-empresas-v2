@@ -1028,7 +1028,7 @@ export default function ColaboradorDetalhes() {
           </div>
           
           <div class="footer">
-            <p>Documento gerado em ${new Date().toLocaleString('pt-BR')} | Sistema GestorEPI - Cipolatti</p>
+            <p>Documento gerado em ${new Date().toLocaleString('pt-BR')} | GestorEPI - Sistema de Gestão de EPI</p>
             <p>Este documento atende à NR-6 do Ministério do Trabalho e Emprego</p>
             <p style="margin-top:5px;font-weight:bold;">Código de Autenticação: ${authCode}</p>
           </div>

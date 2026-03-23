@@ -56,12 +56,10 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/90 to-slate-900/90"></div>
         <div className="absolute inset-0 flex items-center justify-center p-12">
           <div className="text-white max-w-md">
-            <img 
-              src="/icone-cipolatti.png" 
-              alt="Cipolatti" 
-              className="w-20 h-20 mb-6 rounded-lg bg-white p-2"
-            />
-            <h1 className="text-4xl font-bold mb-4 tracking-tight">Cipolatti</h1>
+            <div className="w-20 h-20 mb-6 rounded-lg bg-white p-3 flex items-center justify-center">
+              <span className="text-3xl font-bold text-emerald-600">GE</span>
+            </div>
+            <h1 className="text-4xl font-bold mb-4 tracking-tight">GestorEPI</h1>
             <p className="text-xl text-emerald-100">Sistema de Gestão de EPI</p>
             <p className="mt-4 text-slate-300">Controle completo de equipamentos de proteção individual com rastreamento por QR Code e reconhecimento facial.</p>
           </div>
@@ -72,14 +70,12 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-8">
             <div className="flex items-center gap-3 mb-8">
-              <img 
-                src="/icone-cipolatti.png" 
-                alt="Cipolatti" 
-                className="w-12 h-12 rounded-md object-contain"
-              />
+              <div className="w-12 h-12 rounded-md bg-emerald-100 flex items-center justify-center">
+                <span className="text-lg font-bold text-emerald-600">GE</span>
+              </div>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Entrar</h2>
-                <p className="text-sm text-slate-600">Sistema Cipolatti</p>
+                <p className="text-sm text-slate-600">GestorEPI</p>
               </div>
             </div>
 
@@ -153,7 +149,7 @@ export default function Login() {
           </div>
 
           <p className="text-center text-sm text-slate-600 mt-6">
-            Versão 1.0 - Sistema Cipolatti © 2026
+            Versão 1.0 - GestorEPI © 2026
           </p>
         </div>
       </div>

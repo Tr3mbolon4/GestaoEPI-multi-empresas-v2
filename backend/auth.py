@@ -8,7 +8,7 @@ from database import get_db
 from bson import ObjectId
 import os
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'cipolatti-secret-key-production-2026-emerald')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'gestorepi-secret-key-production-2026-emerald')
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
@@ -56,14 +56,60 @@ async def get_current_user(
         raise HTTPException(status_code=400, detail='Usuário inativo')
     
     user['id'] = str(user['_id'])
+    
+    # MULTI-TENANT: Verificar empresa do usuário
+    empresa_id = user.get('empresa_id')
+    if empresa_id and user.get('role') != 'super_admin':
+        empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+        if empresa:
+            # Verificar se empresa está bloqueada
+            if empresa.get('status') == 'bloqueado':
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail='Empresa bloqueada. Entre em contato com o administrador.'
+                )
+            user['empresa_nome'] = empresa.get('nome')
+        user['empresa_id'] = empresa_id
+    
     return user
 
 def require_role(*allowed_roles):
     async def role_checker(current_user: dict = Depends(get_current_user)):
-        if current_user.get('role') not in allowed_roles:
+        user_role = current_user.get('role')
+        # SUPER_ADMIN sempre tem acesso
+        if user_role == 'super_admin':
+            return current_user
+        if user_role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail='Permissão insuficiente'
             )
         return current_user
     return role_checker
+
+def require_super_admin():
+    """Middleware exclusivo para SUPER_ADMIN (dono do sistema)"""
+    async def super_admin_checker(current_user: dict = Depends(get_current_user)):
+        if current_user.get('role') != 'super_admin':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='Acesso restrito ao Super Administrador'
+            )
+        return current_user
+    return super_admin_checker
+
+def get_empresa_filter(current_user: dict) -> dict:
+    """
+    Retorna filtro de empresa_id baseado no usuário.
+    SUPER_ADMIN pode ver todos, outros só veem da sua empresa.
+    """
+    if current_user.get('role') == 'super_admin':
+        return {}  # Sem filtro - vê todas as empresas
+    
+    empresa_id = current_user.get('empresa_id')
+    if not empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Usuário não associado a uma empresa'
+        )
+    return {"empresa_id": empresa_id}

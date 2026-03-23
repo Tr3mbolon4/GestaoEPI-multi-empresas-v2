@@ -1,0 +1,88 @@
+{
+  "test_type": "multi_tenant_gestorepi",
+  "total_tests": 13,
+  "passed_tests": 13,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "test_results": [
+    {
+      "name": "SUPER_ADMIN login successful",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:45.252476"
+    },
+    {
+      "name": "Admin login successful",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:45.652736"
+    },
+    {
+      "name": "Health check endpoint responding",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:45.824717"
+    },
+    {
+      "name": "System shows GestorEPI branding",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:45.992231"
+    },
+    {
+      "name": "GET /api/empresas returns company list",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:46.107224"
+    },
+    {
+      "name": "Empresa response contains required fields",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:46.107246"
+    },
+    {
+      "name": "Admin correctly restricted from empresas endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:46.258157"
+    },
+    {
+      "name": "POST /api/empresas/{id}/bloquear works",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:46.403047"
+    },
+    {
+      "name": "POST /api/empresas/{id}/ativar works",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:46.517313"
+    },
+    {
+      "name": "GET /api/empresas/{id}/stats returns statistics",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:46.654261"
+    },
+    {
+      "name": "Admin can access employees endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:46.776374"
+    },
+    {
+      "name": "Admin only sees employees from their company",
+      "success": true,
+      "details": "No employees found (acceptable)",
+      "timestamp": "2026-03-23T18:05:46.776391"
+    },
+    {
+      "name": "SUPER_ADMIN has broader access than Admin",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-23T18:05:47.237248"
+    }
+  ],
+  "timestamp": "2026-03-23T18:05:47.237278"
+}

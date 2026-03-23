@@ -15,6 +15,7 @@ import Fornecedores from '@/pages/Fornecedores';
 import ColaboradorDetalhes from '@/pages/ColaboradorDetalhes';
 import HistoricoEntregas from '@/pages/HistoricoEntregas';
 import Alertas from '@/pages/Alertas';
+import PainelMaster from '@/pages/PainelMaster';
 import '@/App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -48,6 +49,7 @@ function AppRoutes() {
       <Route path="/usuarios" element={<PrivateRoute><Usuarios /></PrivateRoute>} />
       <Route path="/configuracoes" element={<PrivateRoute><Configuracoes /></PrivateRoute>} />
       <Route path="/alertas" element={<PrivateRoute><Alertas /></PrivateRoute>} />
+      <Route path="/painel-master" element={<PrivateRoute><PainelMaster /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   );

@@ -41,15 +41,10 @@ export const DashboardLayout = ({ children }) => {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <img 
-              src={`${process.env.PUBLIC_URL}/icone-cipolatti.png`}
-              alt="Cipolatti" 
-              className="w-8 h-8 object-contain bg-white rounded-md p-1"
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
-            <span className="text-white font-bold">Cipolatti</span>
+            <div className="w-8 h-8 bg-emerald-100 rounded-md flex items-center justify-center">
+              <span className="text-emerald-600 font-bold text-sm">GE</span>
+            </div>
+            <span className="text-white font-bold">GestorEPI</span>
           </div>
           <div className="w-10"></div>
         </div>

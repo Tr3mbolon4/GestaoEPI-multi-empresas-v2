@@ -78,7 +78,7 @@ export default function Dashboard() {
       <div className="space-y-6" data-testid="dashboard">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
-          <p className="text-slate-600 mt-1">Visão geral do sistema Cipolatti</p>
+          <p className="text-slate-600 mt-1">Visão geral do sistema GestorEPI</p>
         </div>
 
         {/* Cards Clicáveis - BI Interativo */}
