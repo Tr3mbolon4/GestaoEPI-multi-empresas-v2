@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 class GestaoEPITester:
-    def __init__(self, base_url="https://safety-gear-5.preview.emergentagent.com"):
+    def __init__(self, base_url="https://epi-manager-12.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.token = None
