@@ -136,12 +136,15 @@ export const Sidebar = ({ onClose }) => {
       <div className="p-6 border-b border-slate-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md overflow-hidden bg-emerald-100 flex items-center justify-center flex-shrink-0">
-              <span className="text-emerald-600 font-bold text-lg">GE</span>
+            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center flex-shrink-0 border border-slate-700">
+              <span className="font-bold text-lg">
+                <span className="text-slate-300">G</span>
+                <span className="text-blue-400">E</span>
+              </span>
             </div>
             <div>
-              <h1 className="text-white font-bold text-lg tracking-tight">GestorEPI</h1>
-              <p className="text-slate-400 text-xs">Gestão de EPI</p>
+              <h1 className="text-white font-bold text-lg tracking-tight">Gestão EPI</h1>
+              <p className="text-slate-500 text-xs">Sistema Multi-Empresa</p>
             </div>
           </div>
           {onClose && (

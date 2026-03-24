@@ -67,7 +67,7 @@ export default function Dashboard() {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
       </DashboardLayout>
     );
@@ -78,7 +78,7 @@ export default function Dashboard() {
       <div className="space-y-6" data-testid="dashboard">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
-          <p className="text-slate-600 mt-1">Visão geral do sistema GestorEPI</p>
+          <p className="text-slate-600 mt-1">Visão geral do sistema Gestão EPI</p>
         </div>
 
         {/* Cards Clicáveis - BI Interativo */}
