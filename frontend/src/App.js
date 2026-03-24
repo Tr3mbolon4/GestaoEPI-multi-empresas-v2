@@ -16,6 +16,8 @@ import ColaboradorDetalhes from '@/pages/ColaboradorDetalhes';
 import HistoricoEntregas from '@/pages/HistoricoEntregas';
 import Alertas from '@/pages/Alertas';
 import PainelMaster from '@/pages/PainelMaster';
+import LGPDDashboard from '@/pages/LGPDDashboard';
+import RelatoriosAvancados from '@/pages/RelatoriosAvancados';
 import '@/App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -50,6 +52,8 @@ function AppRoutes() {
       <Route path="/configuracoes" element={<PrivateRoute><Configuracoes /></PrivateRoute>} />
       <Route path="/alertas" element={<PrivateRoute><Alertas /></PrivateRoute>} />
       <Route path="/painel-master" element={<PrivateRoute><PainelMaster /></PrivateRoute>} />
+      <Route path="/lgpd" element={<PrivateRoute><LGPDDashboard /></PrivateRoute>} />
+      <Route path="/relatorios" element={<PrivateRoute><RelatoriosAvancados /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   );

@@ -1226,33 +1226,37 @@ async def get_facial_templates(employee_id: str, current_user: dict = Depends(ge
 # Endpoint otimizado para buscar TODOS os templates de uma vez
 @api_router.get('/facial-templates/all')
 async def get_all_facial_templates(current_user: dict = Depends(get_current_user)):
-    """Retorna todos os templates faciais com informações do colaborador - otimizado para reconhecimento"""
+    """Retorna todos os templates faciais com informações do colaborador - otimizado para reconhecimento
+    MULTI-TENANT: Retorna apenas templates de colaboradores da mesma empresa
+    """
     db = await get_db()
     
-    # Buscar todos os templates
-    templates = await db.facial_templates.find({}).to_list(1000)
+    # MULTI-TENANT: Filtrar colaboradores por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    emp_query = {}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    
+    # Buscar colaboradores da empresa primeiro
+    employees = await db.employees.find(emp_query).to_list(5000)
+    if not employees:
+        return []
+    
+    # Criar mapa de colaboradores e lista de IDs
+    emp_map = {}
+    employee_ids = []
+    for e in employees:
+        emp_id = str(e['_id'])
+        emp_map[emp_id] = doc_to_response(e)
+        employee_ids.append(ObjectId(e['_id']))
+    
+    # Buscar templates APENAS dos colaboradores da empresa
+    templates = await db.facial_templates.find({
+        "employee_id": {"$in": [str(eid) for eid in employee_ids] + employee_ids}
+    }).to_list(5000)
     
     if not templates:
         return []
-    
-    # Buscar todos os colaboradores de uma vez
-    employee_ids = []
-    for t in templates:
-        emp_id = t.get('employee_id')
-        if emp_id:
-            # Converter para ObjectId se for string
-            if isinstance(emp_id, str):
-                employee_ids.append(ObjectId(emp_id))
-            else:
-                employee_ids.append(emp_id)
-    
-    employee_ids = list(set(employee_ids))
-    employees = await db.employees.find({
-        "_id": {"$in": employee_ids}
-    }).to_list(1000)
-    
-    # Criar mapa de colaboradores
-    emp_map = {str(e['_id']): doc_to_response(e) for e in employees}
     
     # Montar resposta com dados do colaborador
     result = []
@@ -1283,8 +1287,11 @@ async def check_biometric_duplicate(
     data: BiometricCheckRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """Verifica se existe biometria duplicada no sistema"""
+    """Verifica se existe biometria duplicada no sistema - MULTI-TENANT: apenas na mesma empresa"""
     db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
     
     try:
         # Parsear o descriptor enviado
@@ -1294,13 +1301,18 @@ async def check_biometric_duplicate(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Descriptor inválido")
     
-    # Buscar todos os templates existentes
-    templates = await db.facial_templates.find({}).to_list(1000)
-    
-    # Buscar colaboradores
-    employee_ids = list(set([t.get('employee_id') for t in templates if t.get('employee_id')]))
-    employees = await db.employees.find({"_id": {"$in": [ObjectId(str(e)) for e in employee_ids]}}).to_list(1000)
+    # Buscar colaboradores da empresa primeiro
+    emp_query = {}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    employees = await db.employees.find(emp_query).to_list(5000)
+    employee_ids = [str(e['_id']) for e in employees]
     emp_map = {str(e['_id']): e for e in employees}
+    
+    # Buscar templates apenas dos colaboradores da empresa
+    templates = await db.facial_templates.find({
+        "employee_id": {"$in": employee_ids}
+    }).to_list(1000)
     
     # Comparar com cada template
     for template in templates:
@@ -1523,13 +1535,21 @@ async def delete_facial_template(employee_id: str, template_id: str, current_use
 @api_router.get('/suppliers', response_model=List[SupplierResponse])
 async def get_suppliers(current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho'))):
     db = await get_db()
-    suppliers = await db.suppliers.find({}).to_list(1000)
+    # MULTI-TENANT: Filtrar por empresa
+    query = get_empresa_filter(current_user)
+    suppliers = await db.suppliers.find(query).to_list(1000)
     return [SupplierResponse(**doc_to_response(s)) for s in suppliers]
 
 @api_router.post('/suppliers', response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
 async def create_supplier(supplier_data: SupplierCreate, current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho'))):
     db = await get_db()
-    new_supplier = {**supplier_data.model_dump(), "created_at": datetime.now(timezone.utc)}
+    # MULTI-TENANT: Associar à empresa do usuário
+    empresa_id = current_user.get('empresa_id')
+    new_supplier = {
+        **supplier_data.model_dump(), 
+        "empresa_id": empresa_id,  # MULTI-TENANT
+        "created_at": datetime.now(timezone.utc)
+    }
     result = await db.suppliers.insert_one(new_supplier)
     new_supplier['_id'] = result.inserted_id
     return SupplierResponse(**doc_to_response(new_supplier))
@@ -1537,10 +1557,16 @@ async def create_supplier(supplier_data: SupplierCreate, current_user: dict = De
 @api_router.patch('/suppliers/{supplier_id}', response_model=SupplierResponse)
 async def update_supplier(supplier_id: str, supplier_data: SupplierUpdate, current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho'))):
     db = await get_db()
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(supplier_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
     update_data = {k: v for k, v in supplier_data.model_dump(exclude_unset=True).items()}
     update_data['updated_at'] = datetime.now(timezone.utc)
     result = await db.suppliers.find_one_and_update(
-        {"_id": ObjectId(supplier_id)}, {"$set": update_data}, return_document=True
+        query, {"$set": update_data}, return_document=True
     )
     if not result:
         raise HTTPException(status_code=404, detail='Fornecedor não encontrado')
@@ -1549,7 +1575,13 @@ async def update_supplier(supplier_id: str, supplier_data: SupplierUpdate, curre
 @api_router.delete('/suppliers/{supplier_id}')
 async def delete_supplier(supplier_id: str, current_user: dict = Depends(require_role('admin'))):
     db = await get_db()
-    result = await db.suppliers.delete_one({"_id": ObjectId(supplier_id)})
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(supplier_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    result = await db.suppliers.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail='Fornecedor não encontrado')
     return {'message': 'Fornecedor excluído'}
@@ -1910,17 +1942,26 @@ async def get_deliveries(
 async def get_stock_alerts(current_user: dict = Depends(get_current_user)):
     db = await get_db()
     
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
     # EPIs com estoque baixo
-    low_stock = await db.epis.find({"$expr": {"$lte": ["$current_stock", "$min_stock"]}}).to_list(100)
+    low_stock_query = {"$expr": {"$lte": ["$current_stock", "$min_stock"]}}
+    if empresa_filter:
+        low_stock_query.update(empresa_filter)
+    low_stock = await db.epis.find(low_stock_query).to_list(100)
     
     # EPIs com validade próxima (30 dias)
     expiry_date = datetime.now(timezone.utc) + timedelta(days=30)
-    expiring_soon = await db.epis.find({
+    expiring_query = {
         "$or": [
             {"validity_date": {"$ne": None, "$lte": expiry_date}},
             {"ca_validity": {"$ne": None, "$lte": expiry_date}}
         ]
-    }).to_list(100)
+    }
+    if empresa_filter:
+        expiring_query.update(empresa_filter)
+    expiring_soon = await db.epis.find(expiring_query).to_list(100)
     
     return {
         'low_stock': [{'id': str(e['_id']), 'name': e['name'], 'current_stock': e['current_stock'], 'min_stock': e['min_stock']} for e in low_stock],
@@ -1930,10 +1971,14 @@ async def get_stock_alerts(current_user: dict = Depends(get_current_user)):
 @api_router.get('/stock/movements')
 async def get_stock_movements(current_user: dict = Depends(get_current_user), epi_id: Optional[str] = None):
     db = await get_db()
-    query = {}
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = get_empresa_filter(current_user)
+    
     if epi_id:
         query['epi_id'] = epi_id
     movements = await db.stock_movements.find(query).sort("created_at", -1).to_list(500)
+    return [doc_to_response(m) for m in movements]
     return [doc_to_response(m) for m in movements]
 
 # ===================== LICENSE =====================
@@ -2000,17 +2045,29 @@ async def get_pending_epi_alerts(current_user: dict = Depends(get_current_user))
     """Retorna alertas de EPIs obrigatórios não entregues aos colaboradores"""
     db = await get_db()
     
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
     alerts = []
     
-    # Buscar todos os colaboradores ativos
-    employees = await db.employees.find({"status": "active"}).to_list(5000)
+    # Buscar colaboradores ativos DA EMPRESA
+    emp_query = {"status": "active"}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    employees = await db.employees.find(emp_query).to_list(5000)
     
-    # Buscar todos os kits obrigatórios por setor
-    kits = await db.kits.find({"is_mandatory": {"$ne": False}}).to_list(100)
+    # Buscar kits obrigatórios DA EMPRESA
+    kit_query = {"is_mandatory": {"$ne": False}}
+    if empresa_filter:
+        kit_query.update(empresa_filter)
+    kits = await db.kits.find(kit_query).to_list(100)
     kits_by_sector = {kit.get('sector', '').lower(): kit for kit in kits if kit.get('sector')}
     
-    # Buscar todas as entregas
-    deliveries = await db.deliveries.find({"is_return": False}).to_list(10000)
+    # Buscar entregas DA EMPRESA
+    delivery_query = {"is_return": False}
+    if empresa_filter:
+        delivery_query.update(empresa_filter)
+    deliveries = await db.deliveries.find(delivery_query).to_list(10000)
     
     # Agrupar entregas por colaborador
     deliveries_by_employee = {}
@@ -2068,29 +2125,40 @@ async def get_replacement_due_alerts(current_user: dict = Depends(get_current_us
     """Retorna alertas de EPIs com troca periódica vencida"""
     db = await get_db()
     
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
     alerts = []
     now = datetime.now(timezone.utc)
     
-    # Buscar EPIs com periodicidade de troca definida
-    epis_with_period = await db.epis.find({
-        "replacement_period": {"$ne": None}
-    }).to_list(500)
+    # Buscar EPIs com periodicidade de troca definida DA EMPRESA
+    epi_query = {"replacement_period": {"$ne": None}}
+    if empresa_filter:
+        epi_query.update(empresa_filter)
+    epis_with_period = await db.epis.find(epi_query).to_list(500)
     
     epi_periods = {str(e['_id']): e for e in epis_with_period}
     
     if not epi_periods:
         return alerts
     
-    # Buscar colaboradores ativos
-    employees = await db.employees.find({"status": "active"}).to_list(5000)
+    # Buscar colaboradores ativos DA EMPRESA
+    emp_query = {"status": "active"}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    employees = await db.employees.find(emp_query).to_list(5000)
     emp_map = {str(e['_id']): e for e in employees}
     
     # Buscar entregas mais recentes de EPIs com periodicidade
     epi_ids = list(epi_periods.keys())
     
     # Usar agregação para encontrar última entrega de cada EPI por colaborador
+    match_query = {"is_return": False}
+    if empresa_filter:
+        match_query.update(empresa_filter)
+    
     pipeline = [
-        {"$match": {"is_return": False}},
+        {"$match": match_query},
         {"$unwind": "$items"},
         {"$match": {"items.epi_id": {"$in": epi_ids}}},
         {"$sort": {"created_at": -1}},
@@ -2269,10 +2337,16 @@ async def get_kit_by_sector(sector_name: str, current_user: dict = Depends(get_c
     """Retorna o kit obrigatório vinculado a um setor"""
     db = await get_db()
     
-    kit = await db.kits.find_one({
+    # MULTI-TENANT: Filtrar por empresa
+    query = {
         "sector": {"$regex": f"^{sector_name}$", "$options": "i"},
         "is_mandatory": {"$ne": False}
-    })
+    }
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    kit = await db.kits.find_one(query)
     
     if not kit:
         return None
@@ -2284,9 +2358,16 @@ async def get_sectors_list(current_user: dict = Depends(get_current_user)):
     """Retorna lista de setores com seus kits vinculados"""
     db = await get_db()
     
-    # Buscar setores dos colaboradores
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
+    # Buscar setores dos colaboradores DA EMPRESA
+    match_stage = {"department": {"$ne": None, "$ne": ""}}
+    if empresa_filter:
+        match_stage.update(empresa_filter)
+    
     pipeline = [
-        {"$match": {"department": {"$ne": None, "$ne": ""}}},
+        {"$match": match_stage},
         {"$group": {"_id": "$department"}},
         {"$sort": {"_id": 1}}
     ]
@@ -2294,8 +2375,11 @@ async def get_sectors_list(current_user: dict = Depends(get_current_user)):
     sectors_result = await db.employees.aggregate(pipeline).to_list(100)
     sectors = [s['_id'] for s in sectors_result if s['_id']]
     
-    # Buscar kits
-    kits = await db.kits.find({}).to_list(100)
+    # Buscar kits DA EMPRESA
+    kit_query = {}
+    if empresa_filter:
+        kit_query.update(empresa_filter)
+    kits = await db.kits.find(kit_query).to_list(100)
     kits_by_sector = {(k.get('sector') or '').lower(): k for k in kits}
     
     result = []
@@ -2317,39 +2401,67 @@ async def get_sectors_list(current_user: dict = Depends(get_current_user)):
 async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     db = await get_db()
     
-    active_employees = await db.employees.count_documents({"status": "active"})
-    total_epis = await db.epis.count_documents({})
-    low_stock_count = await db.epis.count_documents({"$expr": {"$lte": ["$current_stock", "$min_stock"]}})
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
     
+    # Colaboradores ativos DA EMPRESA
+    emp_query = {"status": "active"}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    active_employees = await db.employees.count_documents(emp_query)
+    
+    # EPIs DA EMPRESA
+    epi_query = {}
+    if empresa_filter:
+        epi_query.update(empresa_filter)
+    total_epis = await db.epis.count_documents(epi_query)
+    
+    # EPIs com estoque baixo DA EMPRESA
+    low_stock_query = {"$expr": {"$lte": ["$current_stock", "$min_stock"]}}
+    if empresa_filter:
+        low_stock_query.update(empresa_filter)
+    low_stock_count = await db.epis.count_documents(low_stock_query)
+    
+    # Entregas recentes DA EMPRESA
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    recent_deliveries = await db.deliveries.count_documents({
+    delivery_query = {
         "is_return": False,
         "created_at": {"$gte": thirty_days_ago}
-    })
+    }
+    if empresa_filter:
+        delivery_query.update(empresa_filter)
+    recent_deliveries = await db.deliveries.count_documents(delivery_query)
     
-    # EPIs com validade próxima
+    # EPIs com validade próxima DA EMPRESA
     expiry_date = datetime.now(timezone.utc) + timedelta(days=30)
-    expiring_count = await db.epis.count_documents({
+    expiring_query = {
         "$or": [
             {"validity_date": {"$ne": None, "$lte": expiry_date}},
             {"ca_validity": {"$ne": None, "$lte": expiry_date}}
         ]
-    })
+    }
+    if empresa_filter:
+        expiring_query.update(empresa_filter)
+    expiring_count = await db.epis.count_documents(expiring_query)
     
     # NOVO: Contagem de alertas de EPIs obrigatórios pendentes
     pending_epi_alerts = 0
     replacement_due_alerts = 0
     try:
         # Contar alertas de EPIs pendentes (simplificado para performance)
-        kits_with_sectors = await db.kits.count_documents({
+        kit_query = {
             "sector": {"$ne": None, "$ne": ""},
             "is_mandatory": {"$ne": False}
-        })
+        }
+        if empresa_filter:
+            kit_query.update(empresa_filter)
+        kits_with_sectors = await db.kits.count_documents(kit_query)
         
-        # Contar EPIs com periodicidade vencida
-        epis_with_period = await db.epis.count_documents({
-            "replacement_period": {"$ne": None}
-        })
+        # Contar EPIs com periodicidade vencida DA EMPRESA
+        period_query = {"replacement_period": {"$ne": None}}
+        if empresa_filter:
+            period_query.update(empresa_filter)
+        epis_with_period = await db.epis.count_documents(period_query)
         
         # Se houver kits ou EPIs com periodicidade, buscar alertas completos
         if kits_with_sectors > 0 or epis_with_period > 0:
@@ -3228,5 +3340,574 @@ async def excluir_backup(backup_id: str, current_user: dict = Depends(require_su
     await db.backups.delete_one({"_id": ObjectId(backup_id)})
     
     return {"message": "Backup excluído com sucesso"}
+
+# ===================== LGPD - CONFORMIDADE E PROTEÇÃO DE DADOS =====================
+
+@api_router.get('/lgpd/dashboard')
+async def get_lgpd_dashboard(current_user: dict = Depends(require_role('admin', 'seguranca_trabalho'))):
+    """Dashboard de conformidade LGPD da empresa"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
+    # Colaboradores da empresa
+    emp_query = {}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    total_colaboradores = await db.employees.count_documents(emp_query)
+    
+    # Colaboradores com biometria
+    employees = await db.employees.find(emp_query).to_list(10000)
+    employee_ids = [str(e['_id']) for e in employees]
+    
+    colaboradores_com_biometria = await db.facial_templates.count_documents({
+        "employee_id": {"$in": employee_ids}
+    })
+    
+    # Consentimentos registrados
+    consent_query = {}
+    if empresa_filter:
+        consent_query.update(empresa_filter)
+    total_consentimentos = await db.biometric_consent_logs.count_documents(consent_query)
+    
+    # Consentimentos por tipo
+    consent_pipeline = [
+        {"$match": consent_query},
+        {"$group": {
+            "_id": "$consent_type",
+            "count": {"$sum": 1}
+        }}
+    ]
+    consent_by_type = await db.biometric_consent_logs.aggregate(consent_pipeline).to_list(10)
+    consent_map = {c['_id']: c['count'] for c in consent_by_type}
+    
+    # Solicitações de exclusão pendentes (se houver)
+    exclusao_query = {"status": "pending"}
+    if empresa_filter:
+        exclusao_query.update(empresa_filter)
+    exclusoes_pendentes = await db.lgpd_requests.count_documents(exclusao_query) if 'lgpd_requests' in await db.list_collection_names() else 0
+    
+    # Colaboradores SEM consentimento biométrico registrado
+    colaboradores_sem_consentimento = []
+    for emp in employees:
+        emp_id = str(emp['_id'])
+        has_consent = await db.biometric_consent_logs.find_one({
+            "employee_id": emp_id,
+            "consent_type": {"$in": ["granted", "initial"]}
+        })
+        if not has_consent:
+            # Verificar se tem template facial (ou seja, biometria cadastrada)
+            has_template = await db.facial_templates.find_one({"employee_id": emp_id})
+            if has_template:
+                colaboradores_sem_consentimento.append({
+                    "id": emp_id,
+                    "nome": emp.get('full_name'),
+                    "cpf": emp.get('cpf'),
+                    "departamento": emp.get('department')
+                })
+    
+    return {
+        "total_colaboradores": total_colaboradores,
+        "colaboradores_com_biometria": colaboradores_com_biometria,
+        "percentual_biometria": round((colaboradores_com_biometria / total_colaboradores * 100) if total_colaboradores > 0 else 0, 1),
+        "total_consentimentos": total_consentimentos,
+        "consentimentos_por_tipo": {
+            "concedidos": consent_map.get("granted", 0) + consent_map.get("initial", 0),
+            "revogados": consent_map.get("revoked", 0),
+            "atualizados": consent_map.get("updated", 0)
+        },
+        "exclusoes_pendentes": exclusoes_pendentes,
+        "colaboradores_sem_consentimento": colaboradores_sem_consentimento[:20],  # Limitar a 20
+        "total_sem_consentimento": len(colaboradores_sem_consentimento),
+        "status_conformidade": "conforme" if len(colaboradores_sem_consentimento) == 0 else "pendente"
+    }
+
+@api_router.get('/lgpd/consentimentos')
+async def get_lgpd_consentimentos(
+    current_user: dict = Depends(require_role('admin', 'seguranca_trabalho')),
+    page: int = 1,
+    limit: int = 50
+):
+    """Lista todos os consentimentos biométricos registrados"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    query = {}
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    skip = (page - 1) * limit
+    total = await db.biometric_consent_logs.count_documents(query)
+    
+    consentimentos = await db.biometric_consent_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Buscar nomes dos colaboradores
+    emp_ids = list(set([c.get('employee_id') for c in consentimentos if c.get('employee_id')]))
+    employees = await db.employees.find({"_id": {"$in": [ObjectId(e) for e in emp_ids]}}).to_list(len(emp_ids))
+    emp_map = {str(e['_id']): e.get('full_name') for e in employees}
+    
+    return {
+        "consentimentos": [{
+            "id": str(c['_id']),
+            "employee_id": c.get('employee_id'),
+            "employee_name": emp_map.get(c.get('employee_id'), 'N/A'),
+            "consent_type": c.get('consent_type'),
+            "ip_address": c.get('ip_address'),
+            "user_agent": c.get('user_agent', '')[:100],
+            "created_at": c.get('created_at'),
+            "granted_by": c.get('granted_by')
+        } for c in consentimentos],
+        "total": total,
+        "page": page,
+        "total_pages": (total + limit - 1) // limit
+    }
+
+@api_router.post('/lgpd/solicitar-exclusao/{employee_id}')
+async def solicitar_exclusao_dados(
+    employee_id: str,
+    motivo: str = "Solicitação do titular",
+    current_user: dict = Depends(require_role('admin'))
+):
+    """Solicita exclusão de dados de um colaborador (LGPD - direito ao esquecimento)"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Verificar se colaborador pertence à empresa
+    empresa_filter = get_empresa_filter(current_user)
+    emp_query = {"_id": ObjectId(employee_id)}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    
+    employee = await db.employees.find_one(emp_query)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado")
+    
+    # Criar solicitação de exclusão
+    request = {
+        "employee_id": employee_id,
+        "employee_name": employee.get('full_name'),
+        "empresa_id": current_user.get('empresa_id'),
+        "motivo": motivo,
+        "solicitado_por": current_user.get('username'),
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc)
+    }
+    
+    result = await db.lgpd_requests.insert_one(request)
+    
+    return {
+        "message": "Solicitação de exclusão registrada",
+        "request_id": str(result.inserted_id),
+        "status": "pending"
+    }
+
+@api_router.post('/lgpd/executar-exclusao/{employee_id}')
+async def executar_exclusao_dados(
+    employee_id: str,
+    confirmar: bool = False,
+    current_user: dict = Depends(require_role('admin'))
+):
+    """Executa a exclusão de dados biométricos e pessoais de um colaborador"""
+    db = await get_db()
+    
+    if not confirmar:
+        raise HTTPException(status_code=400, detail="É necessário confirmar a exclusão")
+    
+    # MULTI-TENANT: Verificar se colaborador pertence à empresa
+    empresa_filter = get_empresa_filter(current_user)
+    emp_query = {"_id": ObjectId(employee_id)}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    
+    employee = await db.employees.find_one(emp_query)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado")
+    
+    dados_removidos = {
+        "templates_faciais": 0,
+        "consentimentos": 0,
+        "foto_removida": False
+    }
+    
+    # 1. Remover templates faciais
+    result = await db.facial_templates.delete_many({"employee_id": employee_id})
+    dados_removidos["templates_faciais"] = result.deleted_count
+    
+    # 2. Anonimizar consentimentos (manter log mas remover dados identificáveis)
+    result = await db.biometric_consent_logs.update_many(
+        {"employee_id": employee_id},
+        {"$set": {
+            "anonimizado": True,
+            "ip_address": "ANONIMIZADO",
+            "user_agent": "ANONIMIZADO",
+            "anonimizado_em": datetime.now(timezone.utc),
+            "anonimizado_por": current_user.get('username')
+        }}
+    )
+    dados_removidos["consentimentos"] = result.modified_count
+    
+    # 3. Remover foto do colaborador
+    if employee.get('photo_url'):
+        # Limpar URL da foto no registro
+        await db.employees.update_one(
+            {"_id": ObjectId(employee_id)},
+            {"$set": {"photo_url": None, "biometric_consent": False}}
+        )
+        dados_removidos["foto_removida"] = True
+    
+    # 4. Registrar log de exclusão LGPD
+    await db.lgpd_exclusion_logs.insert_one({
+        "employee_id": employee_id,
+        "employee_name": employee.get('full_name'),
+        "empresa_id": current_user.get('empresa_id'),
+        "dados_removidos": dados_removidos,
+        "executado_por": current_user.get('username'),
+        "executado_em": datetime.now(timezone.utc)
+    })
+    
+    # 5. Atualizar solicitação pendente se houver
+    await db.lgpd_requests.update_many(
+        {"employee_id": employee_id, "status": "pending"},
+        {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc)}}
+    )
+    
+    return {
+        "message": f"Dados biométricos do colaborador {employee.get('full_name')} removidos com sucesso",
+        "dados_removidos": dados_removidos
+    }
+
+@api_router.get('/lgpd/export-dados/{employee_id}')
+async def export_dados_colaborador(
+    employee_id: str,
+    current_user: dict = Depends(require_role('admin'))
+):
+    """Exporta todos os dados de um colaborador (LGPD - direito à portabilidade)"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Verificar se colaborador pertence à empresa
+    empresa_filter = get_empresa_filter(current_user)
+    emp_query = {"_id": ObjectId(employee_id)}
+    if empresa_filter:
+        emp_query.update(empresa_filter)
+    
+    employee = await db.employees.find_one(emp_query)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado")
+    
+    # Coletar todos os dados do colaborador
+    dados = {
+        "dados_pessoais": {
+            "nome": employee.get('full_name'),
+            "cpf": employee.get('cpf'),
+            "rg": employee.get('rg'),
+            "email": employee.get('email'),
+            "telefone": employee.get('phone'),
+            "data_nascimento": str(employee.get('birth_date')) if employee.get('birth_date') else None,
+            "departamento": employee.get('department'),
+            "cargo": employee.get('position'),
+            "data_admissao": str(employee.get('admission_date')) if employee.get('admission_date') else None,
+            "matricula": employee.get('registration_number'),
+            "status": employee.get('status')
+        },
+        "consentimentos_biometricos": [],
+        "entregas_epi": [],
+        "biometria_cadastrada": False
+    }
+    
+    # Consentimentos
+    consentimentos = await db.biometric_consent_logs.find({"employee_id": employee_id}).to_list(100)
+    dados["consentimentos_biometricos"] = [{
+        "tipo": c.get('consent_type'),
+        "data": str(c.get('created_at')),
+        "ip": c.get('ip_address'),
+        "concedido_por": c.get('granted_by')
+    } for c in consentimentos]
+    
+    # Verificar biometria
+    template = await db.facial_templates.find_one({"employee_id": employee_id})
+    dados["biometria_cadastrada"] = template is not None
+    
+    # Entregas de EPI
+    entregas = await db.deliveries.find({"employee_id": employee_id}).sort("created_at", -1).to_list(500)
+    dados["entregas_epi"] = [{
+        "data": str(e.get('created_at')),
+        "tipo": "devolução" if e.get('is_return') else "entrega",
+        "itens": [{
+            "epi": i.get('epi_name'),
+            "quantidade": i.get('quantity'),
+            "ca": i.get('ca_number')
+        } for i in e.get('items', [])],
+        "responsavel": e.get('delivered_by_name')
+    } for e in entregas]
+    
+    dados["exportado_em"] = datetime.now(timezone.utc).isoformat()
+    dados["exportado_por"] = current_user.get('username')
+    
+    # Retornar como JSON para download
+    return StreamingResponse(
+        io.BytesIO(json.dumps(dados, ensure_ascii=False, indent=2, default=str).encode('utf-8')),
+        media_type='application/json',
+        headers={'Content-Disposition': f'attachment; filename=dados_colaborador_{employee_id}_{datetime.now().strftime("%Y%m%d")}.json'}
+    )
+
+# ===================== RELATÓRIOS AVANÇADOS COM GRÁFICOS =====================
+
+@api_router.get('/relatorios/entregas-por-periodo')
+async def get_entregas_por_periodo(
+    current_user: dict = Depends(get_current_user),
+    periodo: int = 30,
+    agrupamento: str = "dia"  # dia, semana, mes
+):
+    """Retorna dados de entregas agrupados por período para gráficos"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
+    data_inicio = datetime.now(timezone.utc) - timedelta(days=periodo)
+    
+    match_query = {
+        "is_return": False,
+        "created_at": {"$gte": data_inicio}
+    }
+    if empresa_filter:
+        match_query.update(empresa_filter)
+    
+    # Definir formato de agrupamento
+    if agrupamento == "semana":
+        date_format = "%Y-W%U"
+    elif agrupamento == "mes":
+        date_format = "%Y-%m"
+    else:
+        date_format = "%Y-%m-%d"
+    
+    pipeline = [
+        {"$match": match_query},
+        {"$group": {
+            "_id": {"$dateToString": {"format": date_format, "date": "$created_at"}},
+            "total_entregas": {"$sum": 1},
+            "total_itens": {"$sum": {"$size": "$items"}}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    
+    resultados = await db.deliveries.aggregate(pipeline).to_list(100)
+    
+    # Também contar devoluções
+    match_query["is_return"] = True
+    pipeline_dev = [
+        {"$match": match_query},
+        {"$group": {
+            "_id": {"$dateToString": {"format": date_format, "date": "$created_at"}},
+            "total_devolucoes": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    
+    devolucoes = await db.deliveries.aggregate(pipeline_dev).to_list(100)
+    dev_map = {d['_id']: d['total_devolucoes'] for d in devolucoes}
+    
+    return {
+        "periodo_dias": periodo,
+        "agrupamento": agrupamento,
+        "dados": [{
+            "periodo": r['_id'],
+            "entregas": r['total_entregas'],
+            "itens": r['total_itens'],
+            "devolucoes": dev_map.get(r['_id'], 0)
+        } for r in resultados]
+    }
+
+@api_router.get('/relatorios/consumo-epis')
+async def get_consumo_epis(
+    current_user: dict = Depends(get_current_user),
+    periodo: int = 90,
+    limite: int = 10
+):
+    """Retorna análise de consumo de EPIs para gráficos"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
+    data_inicio = datetime.now(timezone.utc) - timedelta(days=periodo)
+    
+    match_query = {
+        "is_return": False,
+        "created_at": {"$gte": data_inicio}
+    }
+    if empresa_filter:
+        match_query.update(empresa_filter)
+    
+    # Top EPIs mais consumidos
+    pipeline = [
+        {"$match": match_query},
+        {"$unwind": "$items"},
+        {"$group": {
+            "_id": {"epi_id": "$items.epi_id", "epi_name": "$items.epi_name"},
+            "total_quantidade": {"$sum": "$items.quantity"},
+            "total_entregas": {"$sum": 1}
+        }},
+        {"$sort": {"total_quantidade": -1}},
+        {"$limit": limite}
+    ]
+    
+    top_epis = await db.deliveries.aggregate(pipeline).to_list(limite)
+    
+    # Consumo por departamento
+    pipeline_dept = [
+        {"$match": match_query},
+        {"$lookup": {
+            "from": "employees",
+            "localField": "employee_id",
+            "foreignField": "_id",
+            "as": "employee_info"
+        }},
+        {"$unwind": {"path": "$employee_info", "preserveNullAndEmptyArrays": True}},
+        {"$group": {
+            "_id": "$employee_info.department",
+            "total_entregas": {"$sum": 1},
+            "total_itens": {"$sum": {"$size": "$items"}}
+        }},
+        {"$match": {"_id": {"$ne": None}}},
+        {"$sort": {"total_itens": -1}},
+        {"$limit": 10}
+    ]
+    
+    consumo_dept = await db.deliveries.aggregate(pipeline_dept).to_list(10)
+    
+    return {
+        "periodo_dias": periodo,
+        "top_epis": [{
+            "epi_id": e['_id']['epi_id'],
+            "epi_name": e['_id']['epi_name'] or "N/A",
+            "quantidade": e['total_quantidade'],
+            "entregas": e['total_entregas']
+        } for e in top_epis],
+        "consumo_por_departamento": [{
+            "departamento": c['_id'] or "Sem departamento",
+            "entregas": c['total_entregas'],
+            "itens": c['total_itens']
+        } for c in consumo_dept]
+    }
+
+@api_router.get('/relatorios/estoque-critico')
+async def get_estoque_critico(current_user: dict = Depends(get_current_user)):
+    """Retorna EPIs com estoque crítico para dashboard"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
+    query = {"$expr": {"$lte": ["$current_stock", "$min_stock"]}}
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    epis_criticos = await db.epis.find(query).sort("current_stock", 1).to_list(50)
+    
+    # Calcular nível de criticidade
+    result = []
+    for epi in epis_criticos:
+        current = epi.get('current_stock', 0)
+        min_stock = epi.get('min_stock', 1)
+        
+        if min_stock > 0:
+            percentual = (current / min_stock) * 100
+        else:
+            percentual = 0
+        
+        if current == 0:
+            nivel = "zerado"
+        elif percentual <= 25:
+            nivel = "critico"
+        elif percentual <= 50:
+            nivel = "baixo"
+        else:
+            nivel = "atencao"
+        
+        result.append({
+            "id": str(epi['_id']),
+            "nome": epi.get('name'),
+            "ca_number": epi.get('ca_number'),
+            "estoque_atual": current,
+            "estoque_minimo": min_stock,
+            "percentual_estoque": round(percentual, 1),
+            "nivel_criticidade": nivel
+        })
+    
+    return {
+        "total_criticos": len(result),
+        "zerados": len([e for e in result if e['nivel_criticidade'] == 'zerado']),
+        "criticos": len([e for e in result if e['nivel_criticidade'] == 'critico']),
+        "baixos": len([e for e in result if e['nivel_criticidade'] == 'baixo']),
+        "epis": result
+    }
+
+@api_router.get('/relatorios/vencimentos')
+async def get_vencimentos(
+    current_user: dict = Depends(get_current_user),
+    dias: int = 90
+):
+    """Retorna EPIs com validade próxima do vencimento"""
+    db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    empresa_filter = get_empresa_filter(current_user)
+    
+    data_limite = datetime.now(timezone.utc) + timedelta(days=dias)
+    
+    query = {
+        "$or": [
+            {"validity_date": {"$ne": None, "$lte": data_limite}},
+            {"ca_validity": {"$ne": None, "$lte": data_limite}}
+        ]
+    }
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    epis_vencendo = await db.epis.find(query).to_list(100)
+    
+    now = datetime.now(timezone.utc)
+    result = []
+    
+    for epi in epis_vencendo:
+        validity = epi.get('validity_date') or epi.get('ca_validity')
+        if validity:
+            if validity.tzinfo is None:
+                validity = validity.replace(tzinfo=timezone.utc)
+            
+            dias_restantes = (validity - now).days
+            
+            if dias_restantes < 0:
+                status = "vencido"
+            elif dias_restantes <= 7:
+                status = "critico"
+            elif dias_restantes <= 30:
+                status = "urgente"
+            else:
+                status = "atencao"
+            
+            result.append({
+                "id": str(epi['_id']),
+                "nome": epi.get('name'),
+                "ca_number": epi.get('ca_number'),
+                "data_vencimento": validity.isoformat(),
+                "dias_restantes": dias_restantes,
+                "status": status,
+                "tipo_validade": "produto" if epi.get('validity_date') else "CA"
+            })
+    
+    # Ordenar por dias restantes
+    result.sort(key=lambda x: x['dias_restantes'])
+    
+    return {
+        "periodo_dias": dias,
+        "total": len(result),
+        "vencidos": len([e for e in result if e['status'] == 'vencido']),
+        "criticos": len([e for e in result if e['status'] == 'critico']),
+        "urgentes": len([e for e in result if e['status'] == 'urgente']),
+        "epis": result
+    }
 
 app.include_router(api_router)

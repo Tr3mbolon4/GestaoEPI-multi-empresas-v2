@@ -14,7 +14,9 @@ import {
   X,
   History,
   Bell,
-  Crown
+  Crown,
+  Shield,
+  BarChart3
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -87,6 +89,18 @@ export const Sidebar = ({ onClose }) => {
       icon: Box, 
       label: 'Kits', 
       roles: ['super_admin', 'admin', 'gestor', 'seguranca_trabalho'] 
+    },
+    { 
+      path: '/relatorios', 
+      icon: BarChart3, 
+      label: 'Relatórios', 
+      roles: ['super_admin', 'admin', 'gestor', 'seguranca_trabalho'] 
+    },
+    { 
+      path: '/lgpd', 
+      icon: Shield, 
+      label: 'LGPD', 
+      roles: ['super_admin', 'admin', 'seguranca_trabalho'] 
     },
     { 
       path: '/usuarios', 
