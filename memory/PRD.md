@@ -1,15 +1,9 @@
 # PRD - Sistema GestãoEPI Multi-Empresas
 
 ## Problema Original
-Usuário solicitou alteração visual do sistema GestãoEPI:
-1. Usar uma imagem específica como ícone/logo (sem alterar o design da imagem)
-2. Atualizar as cores do painel/site para combinar com o logo
-
-## Características do Logo
-- Fundo cinza escuro (#1a1a1a)
-- Letra "G" em prata/branco (#c0c0c0)
-- Letra "E" em azul marinho (#2d3a4f)
-- Texto "GESTÃO EPI" na parte inferior
+Sistema de Gestão de EPIs Multi-Empresas com:
+1. Atualização visual do logo e cores do painel
+2. Correção de regras de isolamento multi-empresa
 
 ## Arquitetura do Sistema
 - **Frontend**: React 19 + Tailwind CSS + Radix UI
@@ -27,45 +21,68 @@ Usuário solicitou alteração visual do sistema GestãoEPI:
 - Painel Master para super_admin
 - Conformidade LGPD
 
-## O Que Foi Implementado (24/03/2026)
+---
 
-### Visual/UI
-- [x] Logo adicionado em /frontend/public/logo-gestao-epi.jpg
-- [x] Favicon atualizado para usar o novo logo
-- [x] Paleta de cores CSS atualizada em index.css
-- [x] Sidebar atualizada com fundo escuro (#1a1a1a)
-- [x] Botões e elementos com azul marinho (#2d3a4f)
-- [x] Página de Login com novo visual
-- [x] Página de Alteração de Senha com novo visual
-- [x] Dashboard com cards atualizados
-- [x] Header mobile com novo logo
+## Implementações Realizadas
 
-### Arquivos Modificados
-- /frontend/public/index.html (favicon, theme-color)
-- /frontend/src/index.css (variáveis CSS, paleta)
-- /frontend/src/pages/Login.js
-- /frontend/src/pages/ChangePassword.js
-- /frontend/src/pages/Dashboard.js
-- /frontend/src/components/layout/Sidebar.js
-- /frontend/src/components/layout/DashboardLayout.js
-- /frontend/src/App.js
+### 1. Atualização Visual (24/03/2026)
+
+**Logo e Cores:**
+- Logo adicionado em `/frontend/public/logo-gestao-epi.jpg`
+- Favicon atualizado
+- Paleta de cores: cinza escuro (#1a1a1a), prata (#c0c0c0), azul marinho (#2d3a4f)
+- Sidebar com fundo escuro
+- Páginas atualizadas: Login, ChangePassword, Dashboard, DashboardLayout
+
+### 2. Correção de Isolamento Multi-Empresa (24/03/2026)
+
+**Problema:**
+- Fornecedores com mesmo CNPJ eram bloqueados globalmente (deveria ser por empresa)
+- Algumas rotas não filtravam dados por empresa
+
+**Solução - Índices MongoDB:**
+- Removidos índices únicos globais: `cnpj_1`, `cpf_1`, `internal_code_1`, `qr_code_1`
+- Criados índices compostos:
+  - `suppliers: cnpj + empresa_id (unique)`
+  - `employees: cpf + empresa_id (unique)`
+  - `epis: internal_code + empresa_id (unique)`
+  - `epis: qr_code + empresa_id (unique)`
+
+**Solução - Backend:**
+- Adicionada validação de CNPJ duplicado por empresa em `create_supplier`
+- Corrigidas rotas de EPIs (update, delete) com filtro `empresa_id`
+- Corrigidas rotas de Kits (get, update, delete) com filtro `empresa_id`
+- Corrigidas rotas de Employees (update, delete, photo) com filtro `empresa_id`
+- Corrigidas rotas de Deliveries com validação de colaborador/EPI/Kit por empresa
+- Adicionado `empresa_id` nos movimentos de estoque
+
+**Regras Implementadas:**
+- ✅ Isolamento total entre empresas
+- ✅ Mesmo CNPJ permitido em empresas diferentes
+- ✅ Duplicidade bloqueada apenas dentro da mesma empresa
+- ✅ Cada empresa vê apenas seus próprios dados
+
+---
 
 ## Credenciais de Acesso
 - **Super Admin**: superadmin / Super@2026!
 - **Admin Demo**: admin / Admin@2026! (requer troca de senha)
+- **Admin Cipolatti**: admin_cipo / Admin2@2026!
 
-## Próximas Tarefas (Backlog)
+## URLs
+- Preview: https://976ff7db-46af-469d-b365-669a756eb774.preview.emergentagent.com
+
+---
+
+## Backlog
 
 ### P0 (Crítico)
 - Nenhum
 
 ### P1 (Importante)
-- Atualizar outras páginas para consistência visual completa
-- Criar tema escuro opcional
+- Aplicar consistência visual em todas as páginas
+- Adicionar logs de auditoria para operações multi-tenant
 
 ### P2 (Nice to Have)
-- Exportar tema como variáveis customizáveis
-- Adicionar animações de transição
-
-## URLs
-- Preview: https://976ff7db-46af-469d-b365-669a756eb774.preview.emergentagent.com
+- Tema escuro completo
+- Relatórios comparativos entre filiais (para super_admin)
