@@ -40,32 +40,46 @@ async def create_indexes():
         IndexModel([("email", ASCENDING)], unique=True)
     ])
     
-    # Employees indexes
+    # Employees indexes - MULTI-TENANT: único por empresa
     await db.employees.create_indexes([
-        IndexModel([("cpf", ASCENDING)], unique=True),
+        IndexModel([("cpf", ASCENDING), ("empresa_id", ASCENDING)], unique=True, 
+                   partialFilterExpression={"cpf": {"$type": "string"}, "empresa_id": {"$type": "string"}},
+                   name="cpf_empresa_unique"),
         IndexModel([("full_name", ASCENDING)])
     ])
     
-    # Companies indexes
+    # Companies indexes (empresas são globais)
     await db.companies.create_indexes([
         IndexModel([("cnpj", ASCENDING)], unique=True)
     ])
     
-    # EPIs indexes
+    # EPIs indexes - MULTI-TENANT: único por empresa
     await db.epis.create_indexes([
         IndexModel([("ca_number", ASCENDING)]),
-        IndexModel([("internal_code", ASCENDING)], unique=True, partialFilterExpression={"internal_code": {"$type": "string"}}),
-        IndexModel([("qr_code", ASCENDING)], unique=True, partialFilterExpression={"qr_code": {"$type": "string"}})
+        IndexModel([("internal_code", ASCENDING), ("empresa_id", ASCENDING)], unique=True, 
+                   partialFilterExpression={"internal_code": {"$type": "string"}, "empresa_id": {"$type": "string"}},
+                   name="internal_code_empresa_unique"),
+        IndexModel([("qr_code", ASCENDING), ("empresa_id", ASCENDING)], unique=True, 
+                   partialFilterExpression={"qr_code": {"$type": "string"}, "empresa_id": {"$type": "string"}},
+                   name="qr_code_empresa_unique")
     ])
     
-    # Tools indexes
+    # Tools indexes - MULTI-TENANT: único por empresa
     await db.tools.create_indexes([
-        IndexModel([("serial_number", ASCENDING)], unique=True, partialFilterExpression={"serial_number": {"$type": "string"}}),
-        IndexModel([("internal_code", ASCENDING)], unique=True, partialFilterExpression={"internal_code": {"$type": "string"}}),
-        IndexModel([("qr_code", ASCENDING)], unique=True, partialFilterExpression={"qr_code": {"$type": "string"}})
+        IndexModel([("serial_number", ASCENDING), ("empresa_id", ASCENDING)], unique=True, 
+                   partialFilterExpression={"serial_number": {"$type": "string"}, "empresa_id": {"$type": "string"}},
+                   name="serial_empresa_unique"),
+        IndexModel([("internal_code", ASCENDING), ("empresa_id", ASCENDING)], unique=True, 
+                   partialFilterExpression={"internal_code": {"$type": "string"}, "empresa_id": {"$type": "string"}},
+                   name="tools_internal_code_empresa_unique"),
+        IndexModel([("qr_code", ASCENDING), ("empresa_id", ASCENDING)], unique=True, 
+                   partialFilterExpression={"qr_code": {"$type": "string"}, "empresa_id": {"$type": "string"}},
+                   name="tools_qr_code_empresa_unique")
     ])
     
-    # Suppliers indexes
+    # Suppliers indexes - MULTI-TENANT: único por empresa
     await db.suppliers.create_indexes([
-        IndexModel([("cnpj", ASCENDING)], unique=True, partialFilterExpression={"cnpj": {"$type": "string"}})
+        IndexModel([("cnpj", ASCENDING), ("empresa_id", ASCENDING)], unique=True, 
+                   partialFilterExpression={"cnpj": {"$type": "string"}, "empresa_id": {"$type": "string"}},
+                   name="cnpj_empresa_unique")
     ])
