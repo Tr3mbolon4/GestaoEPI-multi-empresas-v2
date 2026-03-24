@@ -1,88 +1,197 @@
 {
-  "test_type": "multi_tenant_gestorepi",
-  "total_tests": 13,
-  "passed_tests": 13,
+  "total_tests": 27,
+  "passed_tests": 27,
   "failed_tests": 0,
   "success_rate": 100.0,
   "test_results": [
     {
-      "name": "SUPER_ADMIN login successful",
+      "name": "Login empresa1_admin (admin)",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:45.252476"
+      "timestamp": "2026-03-24T14:26:56.407767"
     },
     {
-      "name": "Admin login successful",
+      "name": "Login empresa2_admin (admin_cipo)",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:45.652736"
+      "timestamp": "2026-03-24T14:26:56.755288"
     },
     {
-      "name": "Health check endpoint responding",
+      "name": "Login superadmin (superadmin)",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:45.824717"
+      "timestamp": "2026-03-24T14:26:57.090593"
     },
     {
-      "name": "System shows GestorEPI branding",
+      "name": "Create supplier in empresa1",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:45.992231"
+      "timestamp": "2026-03-24T14:26:57.223670"
     },
     {
-      "name": "GET /api/empresas returns company list",
+      "name": "Create supplier with same CNPJ in empresa2",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:46.107224"
+      "timestamp": "2026-03-24T14:26:57.356970"
     },
     {
-      "name": "Empresa response contains required fields",
+      "name": "Block duplicate CNPJ within same company",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:46.107246"
+      "timestamp": "2026-03-24T14:26:57.500627"
     },
     {
-      "name": "Admin correctly restricted from empresas endpoint",
+      "name": "Empresa1 cannot see empresa2 suppliers",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:46.258157"
+      "timestamp": "2026-03-24T14:26:57.619616"
     },
     {
-      "name": "POST /api/empresas/{id}/bloquear works",
+      "name": "Empresa2 cannot see empresa1 suppliers",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:46.403047"
+      "timestamp": "2026-03-24T14:26:57.754651"
     },
     {
-      "name": "POST /api/empresas/{id}/ativar works",
+      "name": "Create employee in empresa1",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:46.517313"
+      "timestamp": "2026-03-24T14:26:58.296554"
     },
     {
-      "name": "GET /api/empresas/{id}/stats returns statistics",
+      "name": "Create employee with same CPF in empresa2",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:46.654261"
+      "timestamp": "2026-03-24T14:26:58.445464"
     },
     {
-      "name": "Admin can access employees endpoint",
+      "name": "Block duplicate CPF within same company",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:46.776374"
+      "timestamp": "2026-03-24T14:26:58.562122"
     },
     {
-      "name": "Admin only sees employees from their company",
-      "success": true,
-      "details": "No employees found (acceptable)",
-      "timestamp": "2026-03-23T18:05:46.776391"
-    },
-    {
-      "name": "SUPER_ADMIN has broader access than Admin",
+      "name": "Empresa1 cannot see empresa2 employees",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T18:05:47.237248"
+      "timestamp": "2026-03-24T14:26:58.686090"
+    },
+    {
+      "name": "Empresa2 cannot see empresa1 employees",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:58.830190"
+    },
+    {
+      "name": "Create EPI in empresa1",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:58.966544"
+    },
+    {
+      "name": "Create EPI in empresa2",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:59.081854"
+    },
+    {
+      "name": "Empresa1 cannot see empresa2 EPIs",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:59.195973"
+    },
+    {
+      "name": "Empresa2 cannot see empresa1 EPIs",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:59.322416"
+    },
+    {
+      "name": "Create delivery in empresa1 (photo required)",
+      "success": true,
+      "details": "Expected: facial recognition required",
+      "timestamp": "2026-03-24T14:26:59.463284"
+    },
+    {
+      "name": "Create delivery in empresa2 (photo required)",
+      "success": true,
+      "details": "Expected: facial recognition required",
+      "timestamp": "2026-03-24T14:26:59.608941"
+    },
+    {
+      "name": "Empresa1 can access deliveries endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:59.735792"
+    },
+    {
+      "name": "Empresa2 can access deliveries endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:59.848613"
+    },
+    {
+      "name": "Empresa1 dashboard accessible",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:26:59.968504"
+    },
+    {
+      "name": "Empresa2 dashboard accessible",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:27:00.086550"
+    },
+    {
+      "name": "SuperAdmin can see all empresas",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:27:00.211487"
+    },
+    {
+      "name": "SuperAdmin can access master dashboard",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:27:00.333703"
+    },
+    {
+      "name": "Empresa1 blocked from accessing empresa2 employee",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:27:00.452476"
+    },
+    {
+      "name": "Empresa2 blocked from accessing empresa1 employee",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T14:27:00.582191"
     }
   ],
-  "timestamp": "2026-03-23T18:05:47.237278"
+  "test_data": {
+    "empresa1": {
+      "suppliers": [
+        "69c29f315d0815fa52f7af9e"
+      ],
+      "employees": [
+        "69c29f325d0815fa52f7afa0"
+      ],
+      "epis": [
+        "69c29f325d0815fa52f7afa2"
+      ],
+      "deliveries": []
+    },
+    "empresa2": {
+      "suppliers": [
+        "69c29f315d0815fa52f7af9f"
+      ],
+      "employees": [
+        "69c29f325d0815fa52f7afa1"
+      ],
+      "epis": [
+        "69c29f335d0815fa52f7afa3"
+      ],
+      "deliveries": []
+    }
+  },
+  "timestamp": "2026-03-24T14:27:00.582219"
 }

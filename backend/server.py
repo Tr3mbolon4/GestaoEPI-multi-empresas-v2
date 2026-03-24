@@ -719,10 +719,17 @@ async def update_employee(employee_id: str, employee_data: EmployeeUpdate, curre
         raise HTTPException(status_code=403, detail='Sem permissão para editar colaboradores')
     
     db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(employee_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
     update_data = {k: v for k, v in employee_data.model_dump(exclude_unset=True).items()}
     update_data['updated_at'] = datetime.now(timezone.utc)
     result = await db.employees.find_one_and_update(
-        {"_id": ObjectId(employee_id)}, {"$set": update_data}, return_document=True
+        query, {"$set": update_data}, return_document=True
     )
     if not result:
         raise HTTPException(status_code=404, detail='Colaborador não encontrado')
@@ -731,7 +738,14 @@ async def update_employee(employee_id: str, employee_data: EmployeeUpdate, curre
 @api_router.delete('/employees/{employee_id}')
 async def delete_employee(employee_id: str, current_user: dict = Depends(require_role('admin'))):
     db = await get_db()
-    result = await db.employees.delete_one({"_id": ObjectId(employee_id)})
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(employee_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    result = await db.employees.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail='Colaborador não encontrado')
     return {'message': 'Colaborador excluído'}
@@ -742,7 +756,14 @@ async def upload_employee_photo(employee_id: str, file: UploadFile = File(...), 
         raise HTTPException(status_code=403, detail='Sem permissão')
     
     db = await get_db()
-    employee = await db.employees.find_one({"_id": ObjectId(employee_id)})
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(employee_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    employee = await db.employees.find_one(query)
     if not employee:
         raise HTTPException(status_code=404, detail='Colaborador não encontrado')
     
@@ -755,7 +776,7 @@ async def upload_employee_photo(employee_id: str, file: UploadFile = File(...), 
         shutil.copyfileobj(file.file, buffer)
     
     photo_path = f'/uploads/employees/{file_name}'
-    await db.employees.update_one({"_id": ObjectId(employee_id)}, {"$set": {"photo_path": photo_path}})
+    await db.employees.update_one(query, {"$set": {"photo_path": photo_path}})
     return {'photo_path': photo_path}
 
 # ===================== IMPORTAÇÃO/EXPORTAÇÃO =====================
@@ -767,7 +788,11 @@ async def export_employees_excel(current_user: dict = Depends(get_current_user))
         raise HTTPException(status_code=403, detail='Permissão insuficiente')
     
     db = await get_db()
-    employees = await db.employees.find().to_list(5000)
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = get_empresa_filter(current_user)
+    
+    employees = await db.employees.find(query).to_list(5000)
     companies = {str(c['_id']): c['legal_name'] async for c in db.companies.find()}
     
     wb = Workbook()
@@ -1545,6 +1570,16 @@ async def create_supplier(supplier_data: SupplierCreate, current_user: dict = De
     db = await get_db()
     # MULTI-TENANT: Associar à empresa do usuário
     empresa_id = current_user.get('empresa_id')
+    
+    # Validar CNPJ duplicado DENTRO DA MESMA EMPRESA
+    if supplier_data.cnpj:
+        existing = await db.suppliers.find_one({
+            "cnpj": supplier_data.cnpj,
+            "empresa_id": empresa_id
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail='CNPJ já cadastrado nesta empresa')
+    
     new_supplier = {
         **supplier_data.model_dump(), 
         "empresa_id": empresa_id,  # MULTI-TENANT
@@ -1686,6 +1721,13 @@ async def get_epi(epi_id: str, current_user: dict = Depends(require_role('admin'
 @api_router.patch('/epis/{epi_id}', response_model=EPIResponse)
 async def update_epi(epi_id: str, epi_data: EPIUpdate, current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho'))):
     db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(epi_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
     update_data = {k: v for k, v in epi_data.model_dump(exclude_unset=True).items()}
     update_data['updated_at'] = datetime.now(timezone.utc)
     
@@ -1693,7 +1735,7 @@ async def update_epi(epi_id: str, epi_data: EPIUpdate, current_user: dict = Depe
     if update_data.get('replacement_period'):
         update_data['replacement_period'] = str(update_data['replacement_period'].value) if hasattr(update_data['replacement_period'], 'value') else str(update_data['replacement_period'])
     
-    result = await db.epis.find_one_and_update({"_id": ObjectId(epi_id)}, {"$set": update_data}, return_document=True)
+    result = await db.epis.find_one_and_update(query, {"$set": update_data}, return_document=True)
     if not result:
         raise HTTPException(status_code=404, detail='EPI não encontrado')
     stock_status, validity_status = calculate_epi_status(result)
@@ -1705,7 +1747,14 @@ async def update_epi(epi_id: str, epi_data: EPIUpdate, current_user: dict = Depe
 @api_router.delete('/epis/{epi_id}')
 async def delete_epi(epi_id: str, current_user: dict = Depends(require_role('admin'))):
     db = await get_db()
-    result = await db.epis.delete_one({"_id": ObjectId(epi_id)})
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(epi_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    result = await db.epis.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail='EPI não encontrado')
     return {'message': 'EPI excluído'}
@@ -1760,7 +1809,14 @@ async def create_kit(kit_data: KitCreate, current_user: dict = Depends(require_r
 @api_router.get('/kits/{kit_id}', response_model=KitResponse)
 async def get_kit(kit_id: str, current_user: dict = Depends(get_current_user)):
     db = await get_db()
-    kit = await db.kits.find_one({"_id": ObjectId(kit_id)})
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(kit_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    kit = await db.kits.find_one(query)
     if not kit:
         raise HTTPException(status_code=404, detail='Kit não encontrado')
     return KitResponse(**doc_to_response(kit))
@@ -1768,6 +1824,13 @@ async def get_kit(kit_id: str, current_user: dict = Depends(get_current_user)):
 @api_router.patch('/kits/{kit_id}', response_model=KitResponse)
 async def update_kit(kit_id: str, kit_data: KitUpdate, current_user: dict = Depends(require_role('admin', 'gestor', 'seguranca_trabalho'))):
     db = await get_db()
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(kit_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
     update_data = {}
     
     if kit_data.name is not None:
@@ -1799,7 +1862,7 @@ async def update_kit(kit_id: str, kit_data: KitUpdate, current_user: dict = Depe
     update_data['updated_at'] = datetime.now(timezone.utc)
     
     result = await db.kits.find_one_and_update(
-        {"_id": ObjectId(kit_id)}, {"$set": update_data}, return_document=True
+        query, {"$set": update_data}, return_document=True
     )
     if not result:
         raise HTTPException(status_code=404, detail='Kit não encontrado')
@@ -1808,7 +1871,14 @@ async def update_kit(kit_id: str, kit_data: KitUpdate, current_user: dict = Depe
 @api_router.delete('/kits/{kit_id}')
 async def delete_kit(kit_id: str, current_user: dict = Depends(require_role('admin'))):
     db = await get_db()
-    result = await db.kits.delete_one({"_id": ObjectId(kit_id)})
+    
+    # MULTI-TENANT: Filtrar por empresa
+    query = {"_id": ObjectId(kit_id)}
+    empresa_filter = get_empresa_filter(current_user)
+    if empresa_filter:
+        query.update(empresa_filter)
+    
+    result = await db.kits.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail='Kit não encontrado')
     return {'message': 'Kit excluído'}
@@ -1822,7 +1892,13 @@ async def create_delivery(delivery_data: DeliveryCreate, current_user: dict = De
     
     db = await get_db()
     
-    employee = await db.employees.find_one({"_id": ObjectId(delivery_data.employee_id)})
+    # MULTI-TENANT: Buscar colaborador filtrando por empresa
+    employee_query = {"_id": ObjectId(delivery_data.employee_id)}
+    empresa_id = current_user.get('empresa_id')
+    if empresa_id and current_user.get('role') != 'super_admin':
+        employee_query["empresa_id"] = empresa_id
+    
+    employee = await db.employees.find_one(employee_query)
     if not employee:
         raise HTTPException(status_code=404, detail='Colaborador não encontrado')
     
@@ -1835,7 +1911,12 @@ async def create_delivery(delivery_data: DeliveryCreate, current_user: dict = De
         item_dict = item.model_dump()
         
         if item.epi_id:
-            epi = await db.epis.find_one({"_id": ObjectId(item.epi_id)})
+            # MULTI-TENANT: Buscar EPI filtrando por empresa
+            epi_query = {"_id": ObjectId(item.epi_id)}
+            if empresa_id and current_user.get('role') != 'super_admin':
+                epi_query["empresa_id"] = empresa_id
+            
+            epi = await db.epis.find_one(epi_query)
             if epi:
                 item_dict['epi_name'] = epi['name']
                 item_dict['ca_number'] = epi.get('ca_number', '')
@@ -1847,13 +1928,19 @@ async def create_delivery(delivery_data: DeliveryCreate, current_user: dict = De
                     "epi_id": item.epi_id,
                     "quantity": item.quantity if delivery_data.is_return else -item.quantity,
                     "employee_id": delivery_data.employee_id,
+                    "empresa_id": empresa_id,  # MULTI-TENANT
                     "created_by": current_user['id'],
                     "created_at": datetime.now(timezone.utc)
                 }
                 await db.stock_movements.insert_one(movement)
         
         if item.kit_id:
-            kit = await db.kits.find_one({"_id": ObjectId(item.kit_id)})
+            # MULTI-TENANT: Buscar Kit filtrando por empresa
+            kit_query = {"_id": ObjectId(item.kit_id)}
+            if empresa_id and current_user.get('role') != 'super_admin':
+                kit_query["empresa_id"] = empresa_id
+            
+            kit = await db.kits.find_one(kit_query)
             if kit:
                 item_dict['kit_name'] = kit['name']
                 # Processar itens do kit
@@ -1978,7 +2065,6 @@ async def get_stock_movements(current_user: dict = Depends(get_current_user), ep
     if epi_id:
         query['epi_id'] = epi_id
     movements = await db.stock_movements.find(query).sort("created_at", -1).to_list(500)
-    return [doc_to_response(m) for m in movements]
     return [doc_to_response(m) for m in movements]
 
 # ===================== LICENSE =====================
