@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for GestãoEPI System
-Tests new features: NBR field, replacement periodicity, mandatory kits, alerts
+Backend API Testing for GestorEPI System
+Tests Master Panel endpoints for SUPER_ADMIN functionality
 """
 
 import requests
@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
-class GestaoEPITester:
+class GestorEPITester:
     def __init__(self, base_url="https://epi-manager-12.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
@@ -23,6 +23,8 @@ class GestaoEPITester:
         self.test_epi_id = None
         self.test_kit_id = None
         self.test_employee_id = None
+        self.test_empresa_id = None
+        self.test_backup_id = None
 
     def log_test(self, name: str, success: bool, details: str = ""):
         """Log test result"""
@@ -76,22 +78,37 @@ class GestaoEPITester:
             return False, {"error": str(e)}
 
     def test_login(self):
-        """Test login with default credentials"""
+        """Test login with SUPER_ADMIN credentials"""
         print("\n🔐 Testing Authentication...")
         
+        # Try SUPER_ADMIN credentials first
         success, response = self.make_request(
             "POST", 
             "auth/login",
-            {"username": "administrador", "password": "LR1a2b3c4567@"}
+            {"username": "superadmin", "password": "Super@2026!"}
         )
         
         if success and 'access_token' in response:
             self.token = response['access_token']
-            self.log_test("Login with administrador", True)
+            self.log_test("Login with superadmin", True)
+            print(f"   Role: {response.get('role', 'unknown')}")
             return True
         else:
-            self.log_test("Login with administrador", False, f"Response: {response}")
-            return False
+            # Fallback to old credentials
+            success, response = self.make_request(
+                "POST", 
+                "auth/login",
+                {"username": "administrador", "password": "LR1a2b3c4567@"}
+            )
+            
+            if success and 'access_token' in response:
+                self.token = response['access_token']
+                self.log_test("Login with administrador (fallback)", True)
+                print(f"   Role: {response.get('role', 'unknown')}")
+                return True
+            else:
+                self.log_test("Login failed", False, f"Response: {response}")
+                return False
 
     def test_health_check(self):
         """Test API health endpoint"""
@@ -105,6 +122,328 @@ class GestaoEPITester:
             print(f"   Backend URL: {response.get('backend_url', 'not_set')}")
         else:
             self.log_test("Health check endpoint", False, str(response))
+
+    def test_master_dashboard(self):
+        """Test Master Dashboard endpoint"""
+        print("\n📊 Testing Master Dashboard...")
+        
+        success, response = self.make_request("GET", "master/dashboard")
+        
+        if success:
+            required_fields = [
+                'total_empresas', 'empresas_ativas', 'total_colaboradores_sistema',
+                'empresas_por_plano', 'media_uso_plano'
+            ]
+            
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                self.log_test("Master Dashboard - all required fields", True)
+                print(f"   Total empresas: {response.get('total_empresas', 0)}")
+                print(f"   Empresas ativas: {response.get('empresas_ativas', 0)}")
+                print(f"   Total colaboradores: {response.get('total_colaboradores_sistema', 0)}")
+                print(f"   Média uso plano: {response.get('media_uso_plano', 0)}%")
+            else:
+                self.log_test("Master Dashboard - all required fields", False, f"Missing: {missing_fields}")
+        else:
+            self.log_test("Master Dashboard endpoint", False, str(response))
+
+    def test_alertas_limite(self):
+        """Test Alertas de Limite endpoint"""
+        print("\n🚨 Testing Alertas de Limite...")
+        
+        success, response = self.make_request("GET", "master/alertas-limite")
+        
+        if success:
+            required_fields = ['alertas', 'total_warning', 'total_critical', 'total_blocked']
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                self.log_test("Alertas de Limite - structure correct", True)
+                alertas = response.get('alertas', [])
+                print(f"   Total alertas: {len(alertas)}")
+                print(f"   Warning: {response.get('total_warning', 0)}")
+                print(f"   Critical: {response.get('total_critical', 0)}")
+                print(f"   Blocked: {response.get('total_blocked', 0)}")
+                
+                # Check alert structure if any exist
+                if alertas:
+                    alert = alertas[0]
+                    alert_fields = ['empresa_id', 'empresa_nome', 'colaboradores_atual', 'limite', 'uso_percentual', 'nivel_alerta']
+                    missing_alert_fields = [field for field in alert_fields if field not in alert]
+                    
+                    if not missing_alert_fields:
+                        self.log_test("Alert structure complete", True)
+                    else:
+                        self.log_test("Alert structure complete", False, f"Missing: {missing_alert_fields}")
+                else:
+                    self.log_test("Alert structure complete", True, "No alerts to check (acceptable)")
+            else:
+                self.log_test("Alertas de Limite - structure correct", False, f"Missing: {missing_fields}")
+        else:
+            self.log_test("Alertas de Limite endpoint", False, str(response))
+
+    def test_get_empresas_for_reports(self):
+        """Get empresas list to use in other tests"""
+        print("\n🏢 Getting Empresas for Report Tests...")
+        
+        success, response = self.make_request("GET", "empresas")
+        
+        if success and response:
+            empresas = response if isinstance(response, list) else []
+            if empresas:
+                self.test_empresa_id = empresas[0].get('id')
+                self.log_test("Get empresas list", True)
+                print(f"   Found {len(empresas)} empresas")
+                print(f"   Using empresa_id: {self.test_empresa_id}")
+                return True
+            else:
+                self.log_test("Get empresas list", False, "No empresas found")
+                return False
+        else:
+            self.log_test("Get empresas list", False, str(response))
+            return False
+
+    def test_empresa_relatorio(self):
+        """Test Empresa Relatório endpoint"""
+        print("\n📋 Testing Empresa Relatório...")
+        
+        if not self.test_empresa_id:
+            self.log_test("Empresa Relatório test", False, "No empresa_id available")
+            return
+        
+        success, response = self.make_request("GET", f"master/empresas/{self.test_empresa_id}/relatorio?periodo=30")
+        
+        if success:
+            required_fields = [
+                'empresa_id', 'empresa_nome', 'total_colaboradores', 'colaboradores_ativos',
+                'limite_colaboradores', 'uso_percentual', 'total_epis', 'total_entregas',
+                'entregas_periodo', 'devolucoes_periodo', 'top_epis_entregues', 'top_colaboradores_entregas'
+            ]
+            
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                self.log_test("Empresa Relatório - all fields present", True)
+                print(f"   Empresa: {response.get('empresa_nome', 'N/A')}")
+                print(f"   Colaboradores: {response.get('total_colaboradores', 0)}/{response.get('limite_colaboradores', 0)}")
+                print(f"   Uso: {response.get('uso_percentual', 0)}%")
+                print(f"   EPIs: {response.get('total_epis', 0)}")
+                print(f"   Entregas período: {response.get('entregas_periodo', 0)}")
+            else:
+                self.log_test("Empresa Relatório - all fields present", False, f"Missing: {missing_fields}")
+        else:
+            self.log_test("Empresa Relatório endpoint", False, str(response))
+
+    def test_historico_planos(self):
+        """Test Histórico de Planos endpoint"""
+        print("\n📜 Testing Histórico de Planos...")
+        
+        if not self.test_empresa_id:
+            self.log_test("Histórico Planos test", False, "No empresa_id available")
+            return
+        
+        success, response = self.make_request("GET", f"master/empresas/{self.test_empresa_id}/historico-planos")
+        
+        if success:
+            historico = response if isinstance(response, list) else []
+            self.log_test("Histórico de Planos endpoint", True)
+            print(f"   Found {len(historico)} histórico entries")
+            
+            # Check structure if any entries exist
+            if historico:
+                entry = historico[0]
+                required_fields = ['plano_anterior', 'plano_novo', 'limite_anterior', 'limite_novo', 'alterado_por', 'alterado_em']
+                missing_fields = [field for field in required_fields if field not in entry]
+                
+                if not missing_fields:
+                    self.log_test("Histórico entry structure", True)
+                else:
+                    self.log_test("Histórico entry structure", False, f"Missing: {missing_fields}")
+            else:
+                self.log_test("Histórico entry structure", True, "No entries to check (acceptable)")
+        else:
+            self.log_test("Histórico de Planos endpoint", False, str(response))
+
+    def test_atualizar_plano(self):
+        """Test Atualizar Plano endpoint"""
+        print("\n✏️ Testing Atualizar Plano...")
+        
+        if not self.test_empresa_id:
+            self.log_test("Atualizar Plano test", False, "No empresa_id available")
+            return
+        
+        # Test plan update
+        success, response = self.make_request(
+            "PATCH", 
+            f"master/empresas/{self.test_empresa_id}/plano?plano=250&limite=250&motivo=Teste automatizado"
+        )
+        
+        if success:
+            self.log_test("Atualizar Plano endpoint", True)
+            print(f"   Response: {response.get('message', 'No message')}")
+            
+            # Verify the change was recorded in history
+            success_hist, hist_response = self.make_request("GET", f"master/empresas/{self.test_empresa_id}/historico-planos")
+            
+            if success_hist and hist_response:
+                recent_entry = hist_response[0] if hist_response else None
+                if recent_entry and recent_entry.get('motivo') == 'Teste automatizado':
+                    self.log_test("Plan update recorded in history", True)
+                else:
+                    self.log_test("Plan update recorded in history", False, "Recent entry not found or incorrect")
+            else:
+                self.log_test("Plan update recorded in history", False, "Could not verify history")
+        else:
+            self.log_test("Atualizar Plano endpoint", False, str(response))
+
+    def test_vigencia_plano(self):
+        """Test Vigência do Plano endpoint"""
+        print("\n📅 Testing Vigência do Plano...")
+        
+        if not self.test_empresa_id:
+            self.log_test("Vigência Plano test", False, "No empresa_id available")
+            return
+        
+        success, response = self.make_request("GET", f"master/empresas/{self.test_empresa_id}/vigencia")
+        
+        if success:
+            required_fields = ['empresa_id', 'plano', 'status_vigencia']
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                self.log_test("Vigência do Plano - structure correct", True)
+                print(f"   Plano: {response.get('plano', 'N/A')}")
+                print(f"   Status: {response.get('status_vigencia', 'N/A')}")
+                print(f"   Dias restantes: {response.get('dias_restantes', 'N/A')}")
+            else:
+                self.log_test("Vigência do Plano - structure correct", False, f"Missing: {missing_fields}")
+        else:
+            self.log_test("Vigência do Plano endpoint", False, str(response))
+
+    def test_criar_backup(self):
+        """Test Criar Backup endpoint"""
+        print("\n💾 Testing Criar Backup...")
+        
+        success, response = self.make_request(
+            "POST", 
+            "master/backup",
+            {"descricao": "Backup de teste automatizado"}
+        )
+        
+        if success:
+            required_fields = ['id', 'nome_arquivo', 'tamanho_bytes', 'colecoes_incluidas', 'status']
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                self.test_backup_id = response.get('id')
+                self.log_test("Criar Backup - structure correct", True)
+                print(f"   Arquivo: {response.get('nome_arquivo', 'N/A')}")
+                print(f"   Tamanho: {response.get('tamanho_formatado', 'N/A')}")
+                print(f"   Coleções: {len(response.get('colecoes_incluidas', []))}")
+                print(f"   Status: {response.get('status', 'N/A')}")
+            else:
+                self.log_test("Criar Backup - structure correct", False, f"Missing: {missing_fields}")
+        else:
+            self.log_test("Criar Backup endpoint", False, str(response))
+
+    def test_listar_backups(self):
+        """Test Listar Backups endpoint"""
+        print("\n📂 Testing Listar Backups...")
+        
+        success, response = self.make_request("GET", "master/backups")
+        
+        if success:
+            required_fields = ['backups', 'total', 'espaco_total_usado']
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                backups = response.get('backups', [])
+                self.log_test("Listar Backups - structure correct", True)
+                print(f"   Total backups: {response.get('total', 0)}")
+                print(f"   Espaço usado: {response.get('espaco_total_usado', 'N/A')}")
+                
+                # Check backup entry structure if any exist
+                if backups:
+                    backup = backups[0]
+                    backup_fields = ['id', 'nome_arquivo', 'tamanho_formatado', 'criado_por', 'criado_em']
+                    missing_backup_fields = [field for field in backup_fields if field not in backup]
+                    
+                    if not missing_backup_fields:
+                        self.log_test("Backup entry structure", True)
+                    else:
+                        self.log_test("Backup entry structure", False, f"Missing: {missing_backup_fields}")
+                else:
+                    self.log_test("Backup entry structure", True, "No backups to check")
+            else:
+                self.log_test("Listar Backups - structure correct", False, f"Missing: {missing_fields}")
+        else:
+            self.log_test("Listar Backups endpoint", False, str(response))
+
+    def test_export_endpoints(self):
+        """Test Export PDF and Excel endpoints"""
+        print("\n📄 Testing Export Endpoints...")
+        
+        if not self.test_empresa_id:
+            self.log_test("Export endpoints test", False, "No empresa_id available")
+            return
+        
+        # Test PDF export
+        success, response = self.make_request(
+            "GET", 
+            f"master/empresas/{self.test_empresa_id}/export/pdf?periodo=30",
+            expected_status=200
+        )
+        
+        if success:
+            self.log_test("Export PDF endpoint", True)
+        else:
+            self.log_test("Export PDF endpoint", False, str(response))
+        
+        # Test Excel export
+        success, response = self.make_request(
+            "GET", 
+            f"master/empresas/{self.test_empresa_id}/export/excel?periodo=30",
+            expected_status=200
+        )
+        
+        if success:
+            self.log_test("Export Excel endpoint", True)
+        else:
+            self.log_test("Export Excel endpoint", False, str(response))
+
+    def test_backup_management(self):
+        """Test Backup Download and Delete endpoints"""
+        print("\n🗂️ Testing Backup Management...")
+        
+        if not self.test_backup_id:
+            self.log_test("Backup management test", False, "No backup_id available")
+            return
+        
+        # Test download backup (should return file)
+        success, response = self.make_request(
+            "GET", 
+            f"master/backups/{self.test_backup_id}/download",
+            expected_status=200
+        )
+        
+        if success:
+            self.log_test("Download Backup endpoint", True)
+        else:
+            self.log_test("Download Backup endpoint", False, str(response))
+        
+        # Test delete backup
+        success, response = self.make_request(
+            "DELETE", 
+            f"master/backups/{self.test_backup_id}",
+            expected_status=200
+        )
+        
+        if success:
+            self.log_test("Delete Backup endpoint", True)
+            print(f"   Response: {response.get('message', 'No message')}")
+        else:
+            self.log_test("Delete Backup endpoint", False, str(response))
 
     def test_epi_with_nbr_field(self):
         """Test EPI creation with NBR field (new feature)"""
@@ -373,7 +712,7 @@ class GestaoEPITester:
 
     def run_all_tests(self):
         """Run all tests in sequence"""
-        print("🧪 Starting GestãoEPI Backend Tests...")
+        print("🧪 Starting GestorEPI Master Panel Backend Tests...")
         print(f"🌐 Testing API: {self.api_url}")
         print("=" * 60)
         
@@ -385,17 +724,36 @@ class GestaoEPITester:
         # Health check
         self.test_health_check()
         
-        # Core new features
+        # Master Panel Tests (Priority)
+        print("\n🎯 MASTER PANEL TESTS (HIGH PRIORITY)")
+        print("-" * 40)
+        
+        self.test_master_dashboard()
+        self.test_alertas_limite()
+        
+        # Get empresas for other tests
+        if self.test_get_empresas_for_reports():
+            self.test_empresa_relatorio()
+            self.test_historico_planos()
+            self.test_atualizar_plano()
+            self.test_vigencia_plano()
+            self.test_export_endpoints()
+        
+        # Backup tests
+        self.test_criar_backup()
+        self.test_listar_backups()
+        self.test_backup_management()
+        
+        # Legacy tests (if time permits)
+        print("\n📋 LEGACY FEATURE TESTS")
+        print("-" * 40)
+        
         self.test_epi_with_nbr_field()
         self.test_epi_replacement_periodicity()
         self.test_mandatory_kit_with_sector()
-        
-        # Alerts system
         self.test_alerts_endpoints()
         self.test_dashboard_with_alerts()
         self.test_employee_alerts()
-        
-        # Delivery history
         self.test_delivery_history_responsible()
         
         # Summary
@@ -425,13 +783,17 @@ class GestaoEPITester:
 
 def main():
     """Main test execution"""
-    tester = GestaoEPITester()
+    tester = GestorEPITester()
     
     try:
         success = tester.run_all_tests()
         
         # Save detailed results
         summary = tester.get_test_summary()
+        
+        # Create test reports directory if it doesn't exist
+        import os
+        os.makedirs('/app/test_reports', exist_ok=True)
         
         with open('/app/test_reports/backend_test_results.json', 'w') as f:
             json.dump(summary, f, indent=2, ensure_ascii=False)

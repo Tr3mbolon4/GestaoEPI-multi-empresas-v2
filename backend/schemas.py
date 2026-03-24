@@ -653,3 +653,138 @@ class SectorKitResponse(BaseModel):
     kit_name: Optional[str] = None
     is_active: bool
     created_at: datetime
+
+
+# ===================== FASE 3 & 4: PAINEL MASTER AVANÇADO =====================
+
+class EmpresaRelatorioFiltro(BaseModel):
+    """Filtros para relatório de empresa"""
+    periodo: str = "30"  # 7, 30, 90, 365 dias
+    tipo: Optional[str] = None  # entregas, colaboradores, epis
+
+class EmpresaRelatorioResponse(BaseModel):
+    """Relatório detalhado de uma empresa"""
+    empresa_id: str
+    empresa_nome: str
+    periodo_dias: int
+    # Métricas gerais
+    total_colaboradores: int
+    colaboradores_ativos: int
+    colaboradores_inativos: int
+    limite_colaboradores: int
+    uso_percentual: float
+    # EPIs
+    total_epis: int
+    epis_estoque_baixo: int
+    epis_vencendo: int
+    # Entregas
+    total_entregas: int
+    entregas_periodo: int
+    devolucoes_periodo: int
+    # Usuários
+    total_usuarios: int
+    # Kits
+    total_kits: int
+    # Alertas
+    alertas_pendentes: int
+    # Tendências (últimos 7 dias)
+    entregas_por_dia: List[dict] = []
+    # Top EPIs mais entregues
+    top_epis_entregues: List[dict] = []
+    # Colaboradores com mais entregas
+    top_colaboradores_entregas: List[dict] = []
+    # Data do relatório
+    gerado_em: datetime
+
+class EmpresaHistoricoPlano(BaseModel):
+    """Histórico de mudança de plano"""
+    id: str
+    empresa_id: str
+    plano_anterior: str
+    plano_novo: str
+    limite_anterior: int
+    limite_novo: int
+    motivo: Optional[str] = None
+    alterado_por: str
+    alterado_em: datetime
+
+class EmpresaAlertaLimite(BaseModel):
+    """Alerta de limite de colaboradores"""
+    empresa_id: str
+    empresa_nome: str
+    colaboradores_atual: int
+    limite: int
+    uso_percentual: float
+    nivel_alerta: str  # warning (80%), critical (90%), blocked (100%)
+    mensagem: str
+
+class PlanoVigencia(BaseModel):
+    """Controle de vigência do plano"""
+    data_inicio: Optional[datetime] = None
+    data_fim: Optional[datetime] = None
+    dias_restantes: Optional[int] = None
+    status_vigencia: str = "ativo"  # ativo, expirando, expirado
+
+class EmpresaUpdateAvancado(BaseModel):
+    """Update avançado de empresa com controle de plano"""
+    nome: Optional[str] = None
+    cnpj: Optional[str] = None
+    status: Optional[EmpresaStatus] = None
+    plano: Optional[EmpresaPlano] = None
+    limite_colaboradores: Optional[int] = None
+    endereco: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+    responsavel: Optional[str] = None
+    # Novos campos de vigência
+    data_inicio_plano: Optional[datetime] = None
+    data_fim_plano: Optional[datetime] = None
+    observacoes_plano: Optional[str] = None
+
+class DashboardMasterResponse(BaseModel):
+    """Dashboard geral do Painel Master"""
+    total_empresas: int
+    empresas_ativas: int
+    empresas_bloqueadas: int
+    total_colaboradores_sistema: int
+    total_entregas_sistema: int
+    # Por plano
+    empresas_por_plano: dict = {}
+    # Alertas
+    empresas_limite_warning: int  # > 80%
+    empresas_limite_critical: int  # > 90%
+    # Métricas de uso
+    media_uso_plano: float
+    # Tendência de crescimento
+    novos_colaboradores_mes: int
+    novas_empresas_mes: int
+
+# ===================== BACKUP =====================
+
+class BackupCreate(BaseModel):
+    """Criar backup manual"""
+    descricao: Optional[str] = None
+    incluir_uploads: bool = False
+
+class BackupResponse(BaseModel):
+    """Informações do backup"""
+    id: str
+    nome_arquivo: str
+    tamanho_bytes: int
+    tamanho_formatado: str
+    colecoes_incluidas: List[str]
+    incluiu_uploads: bool
+    criado_por: str
+    criado_em: datetime
+    status: str  # completed, failed, in_progress
+
+class BackupListResponse(BaseModel):
+    """Lista de backups disponíveis"""
+    backups: List[BackupResponse]
+    total: int
+    espaco_total_usado: str
+
+class RestoreRequest(BaseModel):
+    """Request para restaurar backup"""
+    backup_id: str
+    confirmar: bool = False  # Deve ser True para confirmar

@@ -2514,4 +2514,719 @@ async def get_employee_authentications(
         "status": r.get("status", "active")
     } for r in records]
 
+# ===================== FASE 3: PAINEL MASTER COMPLETO - RELATÓRIOS =====================
+
+@api_router.get('/master/dashboard')
+async def get_master_dashboard(current_user: dict = Depends(require_super_admin())):
+    """Dashboard geral do Painel Master com métricas de todas empresas"""
+    db = await get_db()
+    
+    # Total de empresas
+    total_empresas = await db.empresas.count_documents({})
+    empresas_ativas = await db.empresas.count_documents({"status": "ativo"})
+    empresas_bloqueadas = await db.empresas.count_documents({"status": "bloqueado"})
+    
+    # Total de colaboradores no sistema
+    total_colaboradores = await db.employees.count_documents({})
+    total_entregas = await db.deliveries.count_documents({})
+    
+    # Empresas por plano
+    pipeline_planos = [
+        {"$group": {"_id": "$plano", "count": {"$sum": 1}}}
+    ]
+    planos_result = await db.empresas.aggregate(pipeline_planos).to_list(10)
+    empresas_por_plano = {p['_id']: p['count'] for p in planos_result}
+    
+    # Buscar todas as empresas para calcular alertas de limite
+    empresas = await db.empresas.find({"status": "ativo"}).to_list(1000)
+    
+    empresas_warning = 0
+    empresas_critical = 0
+    total_uso = 0
+    
+    for emp in empresas:
+        emp_id = str(emp['_id'])
+        colab_count = await db.employees.count_documents({"empresa_id": emp_id})
+        limite = emp.get('limite_colaboradores', 50)
+        uso = (colab_count / limite * 100) if limite > 0 else 0
+        total_uso += uso
+        
+        if uso >= 90:
+            empresas_critical += 1
+        elif uso >= 80:
+            empresas_warning += 1
+    
+    media_uso = total_uso / len(empresas) if empresas else 0
+    
+    # Novos colaboradores e empresas no último mês
+    mes_atras = datetime.now(timezone.utc) - timedelta(days=30)
+    novos_colaboradores = await db.employees.count_documents({"created_at": {"$gte": mes_atras}})
+    novas_empresas = await db.empresas.count_documents({"created_at": {"$gte": mes_atras}})
+    
+    return {
+        "total_empresas": total_empresas,
+        "empresas_ativas": empresas_ativas,
+        "empresas_bloqueadas": empresas_bloqueadas,
+        "total_colaboradores_sistema": total_colaboradores,
+        "total_entregas_sistema": total_entregas,
+        "empresas_por_plano": empresas_por_plano,
+        "empresas_limite_warning": empresas_warning,
+        "empresas_limite_critical": empresas_critical,
+        "media_uso_plano": round(media_uso, 1),
+        "novos_colaboradores_mes": novos_colaboradores,
+        "novas_empresas_mes": novas_empresas
+    }
+
+@api_router.get('/master/alertas-limite')
+async def get_alertas_limite(current_user: dict = Depends(require_super_admin())):
+    """Lista empresas que estão próximas ou no limite do plano"""
+    db = await get_db()
+    
+    empresas = await db.empresas.find({"status": "ativo"}).to_list(1000)
+    alertas = []
+    
+    for emp in empresas:
+        emp_id = str(emp['_id'])
+        colab_count = await db.employees.count_documents({"empresa_id": emp_id})
+        limite = emp.get('limite_colaboradores', 50)
+        uso = (colab_count / limite * 100) if limite > 0 else 0
+        
+        if uso >= 80:
+            if uso >= 100:
+                nivel = "blocked"
+                msg = f"BLOQUEADO: Limite atingido ({colab_count}/{limite})"
+            elif uso >= 90:
+                nivel = "critical"
+                msg = f"CRÍTICO: {uso:.0f}% do limite ({colab_count}/{limite})"
+            else:
+                nivel = "warning"
+                msg = f"ATENÇÃO: {uso:.0f}% do limite ({colab_count}/{limite})"
+            
+            alertas.append({
+                "empresa_id": emp_id,
+                "empresa_nome": emp.get('nome'),
+                "colaboradores_atual": colab_count,
+                "limite": limite,
+                "uso_percentual": round(uso, 1),
+                "nivel_alerta": nivel,
+                "mensagem": msg,
+                "plano": emp.get('plano')
+            })
+    
+    # Ordenar por uso percentual decrescente
+    alertas.sort(key=lambda x: x['uso_percentual'], reverse=True)
+    
+    return {
+        "alertas": alertas,
+        "total_warning": len([a for a in alertas if a['nivel_alerta'] == 'warning']),
+        "total_critical": len([a for a in alertas if a['nivel_alerta'] == 'critical']),
+        "total_blocked": len([a for a in alertas if a['nivel_alerta'] == 'blocked'])
+    }
+
+@api_router.get('/master/empresas/{empresa_id}/relatorio')
+async def get_empresa_relatorio(
+    empresa_id: str,
+    periodo: int = 30,
+    current_user: dict = Depends(require_super_admin())
+):
+    """Relatório detalhado de uma empresa específica"""
+    db = await get_db()
+    
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    
+    data_inicio = datetime.now(timezone.utc) - timedelta(days=periodo)
+    
+    # Colaboradores
+    total_colab = await db.employees.count_documents({"empresa_id": empresa_id})
+    colab_ativos = await db.employees.count_documents({"empresa_id": empresa_id, "status": "active"})
+    colab_inativos = total_colab - colab_ativos
+    
+    # EPIs
+    total_epis = await db.epis.count_documents({"empresa_id": empresa_id})
+    epis_baixo = await db.epis.count_documents({
+        "empresa_id": empresa_id,
+        "$expr": {"$lte": ["$current_stock", "$min_stock"]}
+    })
+    
+    data_vencimento = datetime.now(timezone.utc) + timedelta(days=30)
+    epis_vencendo = await db.epis.count_documents({
+        "empresa_id": empresa_id,
+        "$or": [
+            {"validity_date": {"$lte": data_vencimento}},
+            {"ca_validity": {"$lte": data_vencimento}}
+        ]
+    })
+    
+    # Entregas
+    total_entregas = await db.deliveries.count_documents({"empresa_id": empresa_id})
+    entregas_periodo = await db.deliveries.count_documents({
+        "empresa_id": empresa_id,
+        "is_return": False,
+        "created_at": {"$gte": data_inicio}
+    })
+    devolucoes_periodo = await db.deliveries.count_documents({
+        "empresa_id": empresa_id,
+        "is_return": True,
+        "created_at": {"$gte": data_inicio}
+    })
+    
+    # Usuários
+    total_usuarios = await db.users.count_documents({"empresa_id": empresa_id})
+    
+    # Kits
+    total_kits = await db.kits.count_documents({"empresa_id": empresa_id})
+    
+    # Entregas por dia (últimos 7 dias)
+    pipeline_diario = [
+        {
+            "$match": {
+                "empresa_id": empresa_id,
+                "is_return": False,
+                "created_at": {"$gte": datetime.now(timezone.utc) - timedelta(days=7)}
+            }
+        },
+        {
+            "$group": {
+                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$created_at"}},
+                "count": {"$sum": 1}
+            }
+        },
+        {"$sort": {"_id": 1}}
+    ]
+    entregas_diarias = await db.deliveries.aggregate(pipeline_diario).to_list(7)
+    
+    # Top EPIs mais entregues
+    pipeline_top_epis = [
+        {"$match": {"empresa_id": empresa_id, "is_return": False, "created_at": {"$gte": data_inicio}}},
+        {"$unwind": "$items"},
+        {"$group": {"_id": "$items.epi_name", "total": {"$sum": "$items.quantity"}}},
+        {"$sort": {"total": -1}},
+        {"$limit": 5}
+    ]
+    top_epis = await db.deliveries.aggregate(pipeline_top_epis).to_list(5)
+    
+    # Top colaboradores com mais entregas
+    pipeline_top_colab = [
+        {"$match": {"empresa_id": empresa_id, "is_return": False, "created_at": {"$gte": data_inicio}}},
+        {"$group": {"_id": "$employee_name", "total": {"$sum": 1}}},
+        {"$sort": {"total": -1}},
+        {"$limit": 5}
+    ]
+    top_colaboradores = await db.deliveries.aggregate(pipeline_top_colab).to_list(5)
+    
+    limite = empresa.get('limite_colaboradores', 50)
+    uso_percentual = (total_colab / limite * 100) if limite > 0 else 0
+    
+    return {
+        "empresa_id": empresa_id,
+        "empresa_nome": empresa.get('nome'),
+        "periodo_dias": periodo,
+        "total_colaboradores": total_colab,
+        "colaboradores_ativos": colab_ativos,
+        "colaboradores_inativos": colab_inativos,
+        "limite_colaboradores": limite,
+        "uso_percentual": round(uso_percentual, 1),
+        "total_epis": total_epis,
+        "epis_estoque_baixo": epis_baixo,
+        "epis_vencendo": epis_vencendo,
+        "total_entregas": total_entregas,
+        "entregas_periodo": entregas_periodo,
+        "devolucoes_periodo": devolucoes_periodo,
+        "total_usuarios": total_usuarios,
+        "total_kits": total_kits,
+        "alertas_pendentes": 0,  # TODO: calcular alertas específicos
+        "entregas_por_dia": [{"data": e['_id'], "total": e['count']} for e in entregas_diarias],
+        "top_epis_entregues": [{"nome": e['_id'], "total": e['total']} for e in top_epis if e['_id']],
+        "top_colaboradores_entregas": [{"nome": c['_id'], "total": c['total']} for c in top_colaboradores if c['_id']],
+        "gerado_em": datetime.now(timezone.utc).isoformat()
+    }
+
+@api_router.get('/master/empresas/{empresa_id}/export/pdf')
+async def export_empresa_relatorio_pdf(
+    empresa_id: str,
+    periodo: int = 30,
+    current_user: dict = Depends(require_super_admin())
+):
+    """Exporta relatório da empresa em PDF"""
+    db = await get_db()
+    
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    
+    # Buscar dados do relatório
+    relatorio = await get_empresa_relatorio(empresa_id, periodo, current_user)
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=1, spaceAfter=20)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, spaceAfter=10)
+    
+    elements = []
+    
+    # Cabeçalho
+    elements.append(Paragraph(f"Relatório da Empresa", title_style))
+    elements.append(Paragraph(f"{empresa.get('nome')}", subtitle_style))
+    elements.append(Paragraph(f"Período: últimos {periodo} dias | Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # Informações da Empresa
+    elements.append(Paragraph("Informações da Empresa", subtitle_style))
+    info_data = [
+        ['CNPJ:', empresa.get('cnpj', '-')],
+        ['Plano:', empresa.get('plano', '-')],
+        ['Status:', empresa.get('status', '-')],
+        ['Responsável:', empresa.get('responsavel', '-')],
+        ['E-mail:', empresa.get('email', '-')],
+        ['Telefone:', empresa.get('telefone', '-')],
+    ]
+    info_table = Table(info_data, colWidths=[120, 350])
+    info_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 20))
+    
+    # Métricas
+    elements.append(Paragraph("Métricas de Uso", subtitle_style))
+    metrics_data = [
+        ['Métrica', 'Valor'],
+        ['Colaboradores', f"{relatorio['colaboradores_ativos']} ativos / {relatorio['total_colaboradores']} total"],
+        ['Uso do Plano', f"{relatorio['uso_percentual']}% ({relatorio['total_colaboradores']}/{relatorio['limite_colaboradores']})"],
+        ['EPIs Cadastrados', str(relatorio['total_epis'])],
+        ['EPIs Estoque Baixo', str(relatorio['epis_estoque_baixo'])],
+        ['EPIs Vencendo', str(relatorio['epis_vencendo'])],
+        ['Entregas no Período', str(relatorio['entregas_periodo'])],
+        ['Devoluções no Período', str(relatorio['devolucoes_periodo'])],
+        ['Usuários', str(relatorio['total_usuarios'])],
+        ['Kits', str(relatorio['total_kits'])],
+    ]
+    
+    metrics_table = Table(metrics_data, colWidths=[200, 270])
+    metrics_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.4, 0.2, 0.6)),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.Color(0.95, 0.95, 0.95)]),
+    ]))
+    elements.append(metrics_table)
+    elements.append(Spacer(1, 20))
+    
+    # Top EPIs
+    if relatorio['top_epis_entregues']:
+        elements.append(Paragraph("Top 5 EPIs Mais Entregues", subtitle_style))
+        epis_data = [['EPI', 'Quantidade']]
+        for epi in relatorio['top_epis_entregues']:
+            epis_data.append([epi['nome'][:40], str(epi['total'])])
+        
+        epis_table = Table(epis_data, colWidths=[350, 120])
+        epis_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.063, 0.725, 0.506)),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ]))
+        elements.append(epis_table)
+    
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph("Documento gerado pelo GestorEPI - Painel Master", styles['Normal']))
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename=relatorio_{empresa.get("nome", "empresa")}_{datetime.now().strftime("%Y%m%d")}.pdf'}
+    )
+
+@api_router.get('/master/empresas/{empresa_id}/export/excel')
+async def export_empresa_relatorio_excel(
+    empresa_id: str,
+    periodo: int = 30,
+    current_user: dict = Depends(require_super_admin())
+):
+    """Exporta relatório da empresa em Excel"""
+    db = await get_db()
+    
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    
+    relatorio = await get_empresa_relatorio(empresa_id, periodo, current_user)
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Relatório"
+    
+    # Estilos
+    header_fill = PatternFill(start_color="6B21A8", end_color="6B21A8", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    
+    # Título
+    ws['A1'] = f"Relatório - {empresa.get('nome')}"
+    ws['A1'].font = Font(bold=True, size=16)
+    ws['A2'] = f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Período: {periodo} dias"
+    
+    # Informações da Empresa
+    ws['A4'] = "INFORMAÇÕES DA EMPRESA"
+    ws['A4'].font = Font(bold=True, size=12)
+    info = [
+        ('CNPJ', empresa.get('cnpj', '-')),
+        ('Plano', empresa.get('plano', '-')),
+        ('Status', empresa.get('status', '-')),
+        ('Responsável', empresa.get('responsavel', '-')),
+        ('E-mail', empresa.get('email', '-')),
+    ]
+    for i, (label, value) in enumerate(info, 5):
+        ws[f'A{i}'] = label
+        ws[f'B{i}'] = value
+    
+    # Métricas
+    row = 12
+    ws[f'A{row}'] = "MÉTRICAS DE USO"
+    ws[f'A{row}'].font = Font(bold=True, size=12)
+    row += 1
+    
+    metrics = [
+        ('Colaboradores Ativos', relatorio['colaboradores_ativos']),
+        ('Colaboradores Total', relatorio['total_colaboradores']),
+        ('Limite do Plano', relatorio['limite_colaboradores']),
+        ('Uso do Plano (%)', f"{relatorio['uso_percentual']}%"),
+        ('EPIs Cadastrados', relatorio['total_epis']),
+        ('EPIs Estoque Baixo', relatorio['epis_estoque_baixo']),
+        ('EPIs Vencendo', relatorio['epis_vencendo']),
+        ('Entregas no Período', relatorio['entregas_periodo']),
+        ('Devoluções no Período', relatorio['devolucoes_periodo']),
+        ('Usuários', relatorio['total_usuarios']),
+        ('Kits', relatorio['total_kits']),
+    ]
+    
+    for label, value in metrics:
+        ws[f'A{row}'] = label
+        ws[f'B{row}'] = value
+        row += 1
+    
+    # Ajustar largura das colunas
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 40
+    
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename=relatorio_{empresa.get("nome", "empresa")}_{datetime.now().strftime("%Y%m%d")}.xlsx'}
+    )
+
+# ===================== FASE 4: CONTROLE DE PLANOS AVANÇADO =====================
+
+@api_router.get('/master/empresas/{empresa_id}/historico-planos')
+async def get_historico_planos(empresa_id: str, current_user: dict = Depends(require_super_admin())):
+    """Lista histórico de mudanças de plano de uma empresa"""
+    db = await get_db()
+    
+    historico = await db.historico_planos.find({"empresa_id": empresa_id}).sort("alterado_em", -1).to_list(100)
+    
+    return [{
+        "id": str(h['_id']),
+        "plano_anterior": h.get('plano_anterior'),
+        "plano_novo": h.get('plano_novo'),
+        "limite_anterior": h.get('limite_anterior'),
+        "limite_novo": h.get('limite_novo'),
+        "motivo": h.get('motivo'),
+        "alterado_por": h.get('alterado_por'),
+        "alterado_em": h.get('alterado_em')
+    } for h in historico]
+
+@api_router.patch('/master/empresas/{empresa_id}/plano')
+async def atualizar_plano_empresa(
+    empresa_id: str,
+    plano: str,
+    limite: int,
+    motivo: Optional[str] = None,
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
+    current_user: dict = Depends(require_super_admin())
+):
+    """Atualiza plano de uma empresa com registro de histórico"""
+    db = await get_db()
+    
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    
+    # Registrar histórico
+    historico = {
+        "empresa_id": empresa_id,
+        "plano_anterior": empresa.get('plano'),
+        "plano_novo": plano,
+        "limite_anterior": empresa.get('limite_colaboradores'),
+        "limite_novo": limite,
+        "motivo": motivo,
+        "alterado_por": current_user.get('username'),
+        "alterado_em": datetime.now(timezone.utc)
+    }
+    await db.historico_planos.insert_one(historico)
+    
+    # Atualizar empresa
+    update_data = {
+        "plano": plano,
+        "limite_colaboradores": limite,
+        "updated_at": datetime.now(timezone.utc)
+    }
+    
+    if data_inicio:
+        update_data["data_inicio_plano"] = datetime.fromisoformat(data_inicio.replace('Z', '+00:00'))
+    if data_fim:
+        update_data["data_fim_plano"] = datetime.fromisoformat(data_fim.replace('Z', '+00:00'))
+    
+    await db.empresas.update_one({"_id": ObjectId(empresa_id)}, {"$set": update_data})
+    
+    return {"message": "Plano atualizado com sucesso", "historico_id": str(historico.get('_id', ''))}
+
+@api_router.get('/master/empresas/{empresa_id}/vigencia')
+async def get_vigencia_plano(empresa_id: str, current_user: dict = Depends(require_super_admin())):
+    """Retorna informações de vigência do plano"""
+    db = await get_db()
+    
+    empresa = await db.empresas.find_one({"_id": ObjectId(empresa_id)})
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    
+    data_fim = empresa.get('data_fim_plano')
+    status_vigencia = "ativo"
+    dias_restantes = None
+    
+    if data_fim:
+        if data_fim.tzinfo is None:
+            data_fim = data_fim.replace(tzinfo=timezone.utc)
+        
+        now = datetime.now(timezone.utc)
+        delta = data_fim - now
+        dias_restantes = delta.days
+        
+        if dias_restantes < 0:
+            status_vigencia = "expirado"
+        elif dias_restantes <= 30:
+            status_vigencia = "expirando"
+    
+    return {
+        "empresa_id": empresa_id,
+        "plano": empresa.get('plano'),
+        "data_inicio": empresa.get('data_inicio_plano'),
+        "data_fim": empresa.get('data_fim_plano'),
+        "dias_restantes": dias_restantes,
+        "status_vigencia": status_vigencia
+    }
+
+# ===================== BACKUP DO SISTEMA =====================
+
+BACKUP_DIR = ROOT_DIR / 'backups'
+BACKUP_DIR.mkdir(exist_ok=True)
+
+def format_size(size_bytes):
+    """Formata tamanho em bytes para formato legível"""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} TB"
+
+@api_router.post('/master/backup')
+async def criar_backup(
+    descricao: Optional[str] = None,
+    current_user: dict = Depends(require_super_admin())
+):
+    """Cria backup manual do banco de dados"""
+    db = await get_db()
+    
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    backup_filename = f"backup_{timestamp}.json"
+    backup_path = BACKUP_DIR / backup_filename
+    
+    try:
+        # Coleções para backup
+        colecoes = [
+            'empresas', 'users', 'employees', 'epis', 'kits', 
+            'deliveries', 'suppliers', 'companies', 'facial_templates',
+            'stock_movements', 'historico_planos', 'biometric_consent_logs',
+            'ficha_authentications'
+        ]
+        
+        backup_data = {
+            "metadata": {
+                "criado_em": datetime.now(timezone.utc).isoformat(),
+                "criado_por": current_user.get('username'),
+                "descricao": descricao,
+                "versao": "1.0",
+                "colecoes": colecoes
+            },
+            "dados": {}
+        }
+        
+        # Exportar cada coleção
+        for colecao in colecoes:
+            try:
+                docs = await db[colecao].find({}).to_list(50000)
+                # Converter ObjectId para string
+                for doc in docs:
+                    doc['_id'] = str(doc['_id'])
+                    for key, value in doc.items():
+                        if isinstance(value, ObjectId):
+                            doc[key] = str(value)
+                        elif isinstance(value, datetime):
+                            doc[key] = value.isoformat()
+                backup_data["dados"][colecao] = docs
+            except Exception as e:
+                logger.warning(f"Erro ao exportar coleção {colecao}: {e}")
+                backup_data["dados"][colecao] = []
+        
+        # Salvar arquivo
+        with open(backup_path, 'w', encoding='utf-8') as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2, default=str)
+        
+        # Tamanho do arquivo
+        file_size = backup_path.stat().st_size
+        
+        # Registrar backup no banco
+        backup_record = {
+            "nome_arquivo": backup_filename,
+            "caminho": str(backup_path),
+            "tamanho_bytes": file_size,
+            "colecoes": colecoes,
+            "descricao": descricao,
+            "criado_por": current_user.get('username'),
+            "criado_em": datetime.now(timezone.utc),
+            "status": "completed"
+        }
+        result = await db.backups.insert_one(backup_record)
+        
+        # Limpeza de backups antigos (manter últimos 7 dias)
+        await limpar_backups_antigos(db)
+        
+        return {
+            "id": str(result.inserted_id),
+            "nome_arquivo": backup_filename,
+            "tamanho_bytes": file_size,
+            "tamanho_formatado": format_size(file_size),
+            "colecoes_incluidas": colecoes,
+            "criado_em": backup_record["criado_em"].isoformat(),
+            "status": "completed",
+            "message": "Backup criado com sucesso"
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao criar backup: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao criar backup: {str(e)}")
+
+async def limpar_backups_antigos(db):
+    """Remove backups com mais de 7 dias"""
+    try:
+        data_limite = datetime.now(timezone.utc) - timedelta(days=7)
+        
+        # Buscar backups antigos
+        backups_antigos = await db.backups.find({
+            "criado_em": {"$lt": data_limite}
+        }).to_list(100)
+        
+        for backup in backups_antigos:
+            # Remover arquivo
+            try:
+                caminho = Path(backup.get('caminho', ''))
+                if caminho.exists():
+                    caminho.unlink()
+            except Exception as e:
+                logger.warning(f"Erro ao remover arquivo de backup: {e}")
+            
+            # Remover registro
+            await db.backups.delete_one({"_id": backup['_id']})
+        
+        logger.info(f"Removidos {len(backups_antigos)} backups antigos")
+    except Exception as e:
+        logger.error(f"Erro ao limpar backups antigos: {e}")
+
+@api_router.get('/master/backups')
+async def listar_backups(current_user: dict = Depends(require_super_admin())):
+    """Lista todos os backups disponíveis"""
+    db = await get_db()
+    
+    backups = await db.backups.find({}).sort("criado_em", -1).to_list(50)
+    
+    total_size = 0
+    result = []
+    
+    for b in backups:
+        size = b.get('tamanho_bytes', 0)
+        total_size += size
+        result.append({
+            "id": str(b['_id']),
+            "nome_arquivo": b.get('nome_arquivo'),
+            "tamanho_bytes": size,
+            "tamanho_formatado": format_size(size),
+            "colecoes_incluidas": b.get('colecoes', []),
+            "descricao": b.get('descricao'),
+            "criado_por": b.get('criado_por'),
+            "criado_em": b.get('criado_em'),
+            "status": b.get('status', 'completed')
+        })
+    
+    return {
+        "backups": result,
+        "total": len(result),
+        "espaco_total_usado": format_size(total_size)
+    }
+
+@api_router.get('/master/backups/{backup_id}/download')
+async def download_backup(backup_id: str, current_user: dict = Depends(require_super_admin())):
+    """Download de um backup específico"""
+    db = await get_db()
+    
+    backup = await db.backups.find_one({"_id": ObjectId(backup_id)})
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup não encontrado")
+    
+    caminho = Path(backup.get('caminho', ''))
+    if not caminho.exists():
+        raise HTTPException(status_code=404, detail="Arquivo de backup não encontrado")
+    
+    return StreamingResponse(
+        open(caminho, 'rb'),
+        media_type='application/json',
+        headers={'Content-Disposition': f'attachment; filename={backup.get("nome_arquivo")}'}
+    )
+
+@api_router.delete('/master/backups/{backup_id}')
+async def excluir_backup(backup_id: str, current_user: dict = Depends(require_super_admin())):
+    """Exclui um backup específico"""
+    db = await get_db()
+    
+    backup = await db.backups.find_one({"_id": ObjectId(backup_id)})
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup não encontrado")
+    
+    # Remover arquivo
+    try:
+        caminho = Path(backup.get('caminho', ''))
+        if caminho.exists():
+            caminho.unlink()
+    except Exception as e:
+        logger.warning(f"Erro ao remover arquivo: {e}")
+    
+    # Remover registro
+    await db.backups.delete_one({"_id": ObjectId(backup_id)})
+    
+    return {"message": "Backup excluído com sucesso"}
+
 app.include_router(api_router)

@@ -1,105 +1,207 @@
 {
-  "total_tests": 16,
-  "passed_tests": 16,
+  "total_tests": 33,
+  "passed_tests": 33,
   "failed_tests": 0,
   "success_rate": 100.0,
   "test_results": [
     {
-      "name": "Login with administrador",
+      "name": "Login with superadmin",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:09.869309"
+      "timestamp": "2026-03-24T11:35:59.161005"
     },
     {
       "name": "Health check endpoint",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:09.977841"
+      "timestamp": "2026-03-24T11:35:59.353541"
+    },
+    {
+      "name": "Master Dashboard - all required fields",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:35:59.507716"
+    },
+    {
+      "name": "Alertas de Limite - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:35:59.649210"
+    },
+    {
+      "name": "Alert structure complete",
+      "success": true,
+      "details": "No alerts to check (acceptable)",
+      "timestamp": "2026-03-24T11:35:59.649232"
+    },
+    {
+      "name": "Get empresas list",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:35:59.745546"
+    },
+    {
+      "name": "Empresa Relatório - all fields present",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:35:59.903684"
+    },
+    {
+      "name": "Histórico de Planos endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:00.041263"
+    },
+    {
+      "name": "Histórico entry structure",
+      "success": true,
+      "details": "No entries to check (acceptable)",
+      "timestamp": "2026-03-24T11:36:00.041278"
+    },
+    {
+      "name": "Atualizar Plano endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:00.168060"
+    },
+    {
+      "name": "Plan update recorded in history",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:00.288034"
+    },
+    {
+      "name": "Vigência do Plano - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:00.385283"
+    },
+    {
+      "name": "Export PDF endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:00.857949"
+    },
+    {
+      "name": "Export Excel endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:01.022144"
+    },
+    {
+      "name": "Criar Backup - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:01.134889"
+    },
+    {
+      "name": "Listar Backups - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:01.244867"
+    },
+    {
+      "name": "Backup entry structure",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:01.244885"
+    },
+    {
+      "name": "Download Backup endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:01.438013"
+    },
+    {
+      "name": "Delete Backup endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T11:36:01.542880"
     },
     {
       "name": "Create EPI with NBR field only",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:10.228676"
+      "timestamp": "2026-03-24T11:36:01.646798"
     },
     {
       "name": "NBR field correctly stored and returned",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:10.228689"
+      "timestamp": "2026-03-24T11:36:01.646810"
     },
     {
       "name": "Create EPI with both CA and NBR",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:10.391698"
+      "timestamp": "2026-03-24T11:36:01.744968"
     },
     {
       "name": "Reject EPI without CA or NBR",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:10.547465"
+      "timestamp": "2026-03-24T11:36:01.861991"
     },
     {
       "name": "Set EPI replacement period to weekly",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:10.660116"
+      "timestamp": "2026-03-24T11:36:01.954873"
     },
     {
       "name": "Set EPI custom replacement period (45 days)",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:10.798303"
+      "timestamp": "2026-03-24T11:36:02.050456"
     },
     {
       "name": "Create mandatory kit with sector",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:11.012025"
+      "timestamp": "2026-03-24T11:36:02.172811"
     },
     {
       "name": "Reject kit without sector",
       "success": true,
       "details": "Properly rejected",
-      "timestamp": "2026-03-23T16:54:11.380733"
+      "timestamp": "2026-03-24T11:36:02.386927"
     },
     {
       "name": "Get all alerts endpoint",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:11.506636"
+      "timestamp": "2026-03-24T11:36:02.485403"
     },
     {
       "name": "Get pending EPIs alerts",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:11.648307"
+      "timestamp": "2026-03-24T11:36:02.598155"
     },
     {
       "name": "Get replacement due alerts",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:11.804038"
+      "timestamp": "2026-03-24T11:36:02.702952"
     },
     {
       "name": "Dashboard includes alert statistics",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:11.920945"
+      "timestamp": "2026-03-24T11:36:02.808156"
     },
     {
       "name": "Get employee-specific alerts",
       "success": true,
       "details": "",
-      "timestamp": "2026-03-23T16:54:12.151793"
+      "timestamp": "2026-03-24T11:36:03.015801"
     },
     {
       "name": "Delivery history shows responsible person",
       "success": true,
       "details": "No deliveries to test (acceptable)",
-      "timestamp": "2026-03-23T16:54:12.263492"
+      "timestamp": "2026-03-24T11:36:03.118005"
     }
   ],
-  "timestamp": "2026-03-23T16:54:12.263515"
+  "timestamp": "2026-03-24T11:36:03.118032"
 }
