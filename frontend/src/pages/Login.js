@@ -53,35 +53,37 @@ export default function Login() {
         className="hidden lg:block lg:w-1/2 bg-cover bg-center relative"
         style={{ backgroundImage: `url(https://images.unsplash.com/photo-1764154739233-659b2681d162?crop=entropy&cs=srgb&fm=jpg&q=85)` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 to-blue-900/90"></div>
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(26,26,26,0.97) 0%, rgba(45,58,79,0.95) 100%)' }}></div>
         <div className="absolute inset-0 flex items-center justify-center p-12">
           <div className="text-white max-w-md">
-            <div className="w-20 h-20 mb-6 rounded-xl bg-slate-800 border border-slate-600 p-3 flex items-center justify-center shadow-2xl">
-              <span className="text-3xl font-bold">
-                <span className="text-slate-300">G</span>
-                <span className="text-blue-400">E</span>
-              </span>
+            <div className="w-24 h-24 mb-6 rounded-xl overflow-hidden shadow-2xl">
+              <img 
+                src="/logo-gestao-epi.jpg" 
+                alt="Gestão EPI Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
-            <h1 className="text-4xl font-bold mb-2 tracking-tight">GESTÃO EPI</h1>
-            <p className="text-xl text-blue-200">Sistema Multi-Empresa</p>
-            <p className="mt-4 text-slate-300">Controle completo de equipamentos de proteção individual com rastreamento e reconhecimento facial.</p>
+            <h1 className="text-4xl font-bold mb-2 tracking-tight" style={{ color: '#e0e0e0' }}>GESTÃO EPI</h1>
+            <p className="text-xl" style={{ color: '#6b9bd1' }}>Sistema Multi-Empresa</p>
+            <p className="mt-4" style={{ color: '#9ca3af' }}>Controle completo de equipamentos de proteção individual com rastreamento e reconhecimento facial.</p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-8 bg-slate-100">
+      <div className="flex-1 flex items-center justify-center p-8" style={{ backgroundColor: '#f3f4f6' }}>
         <div className="w-full max-w-md">
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-8">
+          <div className="bg-white rounded-xl shadow-lg p-8" style={{ border: '1px solid #d1d5db' }}>
             <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 rounded-lg bg-slate-800 border border-slate-600 flex items-center justify-center">
-                <span className="text-lg font-bold">
-                  <span className="text-slate-300">G</span>
-                  <span className="text-blue-400">E</span>
-                </span>
+              <div className="w-14 h-14 rounded-lg overflow-hidden shadow-md">
+                <img 
+                  src="/logo-gestao-epi.jpg" 
+                  alt="Gestão EPI Logo" 
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Entrar</h2>
-                <p className="text-sm text-slate-600">Gestão EPI</p>
+                <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#1a1a1a' }}>Entrar</h2>
+                <p className="text-sm" style={{ color: '#6b7280' }}>Gestão EPI</p>
               </div>
             </div>
 
@@ -94,7 +96,7 @@ export default function Login() {
               )}
               
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="username" className="block text-sm font-medium mb-1.5" style={{ color: '#374151' }}>
                   E-mail ou Usuário
                 </label>
                 <input
@@ -103,7 +105,10 @@ export default function Login() {
                   data-testid="login-username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ border: '1px solid #d1d5db' }}
+                  onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #2d3a4f40'}
+                  onBlur={(e) => e.target.style.boxShadow = 'none'}
                   placeholder="Digite seu e-mail ou usuário"
                   required
                   autoComplete="username"
@@ -111,7 +116,7 @@ export default function Login() {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="password" className="block text-sm font-medium mb-1.5" style={{ color: '#374151' }}>
                   Senha
                 </label>
                 <input
@@ -120,7 +125,10 @@ export default function Login() {
                   data-testid="login-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ border: '1px solid #d1d5db' }}
+                  onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #2d3a4f40'}
+                  onBlur={(e) => e.target.style.boxShadow = 'none'}
                   placeholder="Digite sua senha"
                   required
                 />
@@ -130,7 +138,10 @@ export default function Login() {
                 type="submit"
                 data-testid="login-submit"
                 disabled={loading}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium shadow-sm rounded-md px-4 py-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full text-white font-medium shadow-sm rounded-md px-4 py-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ backgroundColor: '#2d3a4f' }}
+                onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = '#3d4a5f')}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2d3a4f'}
               >
                 {loading ? (
                   <>
@@ -147,14 +158,15 @@ export default function Login() {
               <button 
                 type="button"
                 onClick={() => toast.info('Contate o administrador para redefinir sua senha.')}
-                className="text-sm text-blue-600 hover:underline"
+                className="text-sm hover:underline"
+                style={{ color: '#2d3a4f' }}
               >
                 Esqueci minha senha
               </button>
             </div>
           </div>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
+          <p className="text-center text-sm mt-6" style={{ color: '#6b7280' }}>
             Gestão EPI © 2026 - Sistema Multi-Empresa
           </p>
         </div>

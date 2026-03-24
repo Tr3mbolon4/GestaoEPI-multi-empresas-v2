@@ -67,7 +67,7 @@ export default function Dashboard() {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#2d3a4f' }}></div>
         </div>
       </DashboardLayout>
     );
@@ -85,73 +85,80 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div 
             onClick={() => handleCardClick('colaboradores')}
-            className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all"
+            className="bg-white rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md transition-all"
+            style={{ border: '1px solid #e5e7eb' }}
+            onMouseOver={(e) => e.currentTarget.style.borderColor = '#2d3a4f'}
+            onMouseOut={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
             data-testid="card-colaboradores"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-emerald-600" />
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#2d3a4f20' }}>
+                <Users className="w-6 h-6" style={{ color: '#2d3a4f' }} />
               </div>
             </div>
             <div>
-              <p className="text-3xl font-bold text-slate-900 font-mono">{stats?.active_employees || 0}</p>
-              <p className="text-sm text-slate-600 mt-1">Colaboradores Ativos</p>
+              <p className="text-3xl font-bold font-mono" style={{ color: '#1a1a1a' }}>{stats?.active_employees || 0}</p>
+              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>Colaboradores Ativos</p>
             </div>
           </div>
 
           <div 
             onClick={() => handleCardClick('epis')}
-            className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all"
+            className="bg-white rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md transition-all"
+            style={{ border: '1px solid #e5e7eb' }}
+            onMouseOver={(e) => e.currentTarget.style.borderColor = '#6b9bd1'}
+            onMouseOut={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
             data-testid="card-epis"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#6b9bd120' }}>
+                <Package className="w-6 h-6" style={{ color: '#6b9bd1' }} />
               </div>
             </div>
             <div>
-              <p className="text-3xl font-bold text-slate-900 font-mono">{stats?.total_epis || 0}</p>
-              <p className="text-sm text-slate-600 mt-1">EPIs Cadastrados</p>
+              <p className="text-3xl font-bold font-mono" style={{ color: '#1a1a1a' }}>{stats?.total_epis || 0}</p>
+              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>EPIs Cadastrados</p>
             </div>
           </div>
 
           <div 
             onClick={() => handleCardClick('estoque_baixo')}
-            className={`border rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md transition-all ${
-              stats?.low_stock_count > 0 
-                ? 'bg-orange-50 border-orange-200 hover:border-orange-400' 
-                : 'bg-white border-slate-200 hover:border-orange-300'
-            }`}
+            className="rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md transition-all"
+            style={{ 
+              backgroundColor: stats?.low_stock_count > 0 ? '#fef3c7' : '#fff',
+              border: stats?.low_stock_count > 0 ? '1px solid #f59e0b' : '1px solid #e5e7eb'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.borderColor = '#f59e0b'}
+            onMouseOut={(e) => e.currentTarget.style.borderColor = stats?.low_stock_count > 0 ? '#f59e0b' : '#e5e7eb'}
             data-testid="card-estoque-baixo"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                stats?.low_stock_count > 0 ? 'bg-orange-200' : 'bg-orange-100'
-              }`}>
-                <AlertTriangle className={`w-6 h-6 ${stats?.low_stock_count > 0 ? 'text-orange-700' : 'text-orange-600'}`} />
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: stats?.low_stock_count > 0 ? '#fcd34d' : '#fed7aa' }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: stats?.low_stock_count > 0 ? '#b45309' : '#ea580c' }} />
               </div>
             </div>
             <div>
-              <p className={`text-3xl font-bold font-mono ${
-                stats?.low_stock_count > 0 ? 'text-orange-700' : 'text-slate-900'
-              }`}>{stats?.low_stock_count || 0}</p>
-              <p className="text-sm text-slate-600 mt-1">Estoque Baixo</p>
+              <p className="text-3xl font-bold font-mono" style={{ color: stats?.low_stock_count > 0 ? '#b45309' : '#1a1a1a' }}>{stats?.low_stock_count || 0}</p>
+              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>Estoque Baixo</p>
             </div>
           </div>
 
           <div 
             onClick={() => handleCardClick('entregas')}
-            className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md hover:border-purple-300 transition-all"
+            className="bg-white rounded-lg shadow-sm p-6 cursor-pointer hover:shadow-md transition-all"
+            style={{ border: '1px solid #e5e7eb' }}
+            onMouseOver={(e) => e.currentTarget.style.borderColor = '#8b5cf6'}
+            onMouseOut={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
             data-testid="card-entregas"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#8b5cf620' }}>
+                <TrendingUp className="w-6 h-6" style={{ color: '#8b5cf6' }} />
               </div>
             </div>
             <div>
-              <p className="text-3xl font-bold text-slate-900 font-mono">{stats?.recent_deliveries || 0}</p>
-              <p className="text-sm text-slate-600 mt-1">Entregas (30 dias)</p>
+              <p className="text-3xl font-bold font-mono" style={{ color: '#1a1a1a' }}>{stats?.recent_deliveries || 0}</p>
+              <p className="text-sm mt-1" style={{ color: '#6b7280' }}>Entregas (30 dias)</p>
             </div>
           </div>
         </div>

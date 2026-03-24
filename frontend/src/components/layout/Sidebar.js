@@ -132,25 +132,29 @@ export const Sidebar = ({ onClose }) => {
   };
 
   return (
-    <div className="w-64 bg-slate-900 min-h-screen flex flex-col" data-testid="sidebar">
-      <div className="p-6 border-b border-slate-800">
+    <div className="w-64 min-h-screen flex flex-col" style={{ backgroundColor: '#1a1a1a' }} data-testid="sidebar">
+      <div className="p-5 border-b" style={{ borderColor: '#2d3a4f' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center flex-shrink-0 border border-slate-700">
-              <span className="font-bold text-lg">
-                <span className="text-slate-300">G</span>
-                <span className="text-blue-400">E</span>
-              </span>
+            <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 shadow-lg" style={{ border: '1px solid #2d3a4f' }}>
+              <img 
+                src="/logo-gestao-epi.jpg" 
+                alt="Gestão EPI Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
-              <h1 className="text-white font-bold text-lg tracking-tight">Gestão EPI</h1>
-              <p className="text-slate-500 text-xs">Sistema Multi-Empresa</p>
+              <h1 className="font-bold text-lg tracking-tight" style={{ color: '#e0e0e0' }}>Gestão EPI</h1>
+              <p className="text-xs" style={{ color: '#6b7280' }}>Sistema Multi-Empresa</p>
             </div>
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg"
+              className="lg:hidden p-2 rounded-lg transition-colors"
+              style={{ color: '#9ca3af' }}
+              onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#2d3a4f'; e.currentTarget.style.color = '#fff'; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#9ca3af'; }}
             >
               <X className="w-5 h-5" />
             </button>
@@ -163,53 +167,68 @@ export const Sidebar = ({ onClose }) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           
+          // Cores do tema GE
+          const activeStyle = item.masterOnly 
+            ? { backgroundColor: '#4c1d95', color: '#fff' }
+            : { backgroundColor: '#2d3a4f', color: '#fff' };
+          
+          const inactiveStyle = item.masterOnly
+            ? { color: '#a78bfa' }
+            : item.highlight 
+              ? { color: '#fbbf24' }
+              : { color: '#c0c0c0' };
+          
           return (
             <Link
               key={item.path}
               to={item.path}
               onClick={onClose}
               data-testid={`nav-${item.path.replace('/', '')}`}
-              className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all
-                ${isActive 
-                  ? item.masterOnly 
-                    ? 'bg-violet-600 text-white'
-                    : 'bg-emerald-600 text-white' 
-                  : item.masterOnly
-                    ? 'text-violet-300 hover:bg-violet-500/20 hover:text-violet-200'
-                    : item.highlight 
-                      ? 'text-orange-300 hover:bg-orange-500/20 hover:text-orange-200'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all"
+              style={isActive ? activeStyle : inactiveStyle}
+              onMouseOver={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = '#2d3a4f40';
+                  e.currentTarget.style.color = '#fff';
                 }
-              `}
+              }}
+              onMouseOut={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = inactiveStyle.color;
+                }
+              }}
             >
-              <Icon className={`w-5 h-5 ${item.masterOnly && !isActive ? 'text-violet-400' : item.highlight && !isActive ? 'text-orange-400' : ''}`} />
+              <Icon className="w-5 h-5" style={!isActive && item.masterOnly ? { color: '#a78bfa' } : !isActive && item.highlight ? { color: '#fbbf24' } : {}} />
               {item.label}
               {item.masterOnly && !isActive && (
-                <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-violet-500 text-white rounded">MASTER</span>
+                <span className="ml-auto px-1.5 py-0.5 text-[10px] rounded" style={{ backgroundColor: '#7c3aed', color: '#fff' }}>MASTER</span>
               )}
               {item.highlight && !item.masterOnly && !isActive && (
-                <span className="ml-auto w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
+                <span className="ml-auto w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#fbbf24' }}></span>
               )}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4" style={{ borderTop: '1px solid #2d3a4f' }}>
         <div className="flex items-center gap-3 mb-3 px-3 py-2">
-          <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-medium text-sm">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm" style={{ backgroundColor: '#2d3a4f' }}>
             {user?.username?.[0]?.toUpperCase() || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate">{user?.username}</p>
-            <p className="text-emerald-400 text-xs truncate">{getProfileLabel(user?.role)}</p>
+            <p className="text-sm font-medium truncate" style={{ color: '#e0e0e0' }}>{user?.username}</p>
+            <p className="text-xs truncate" style={{ color: '#6b9bd1' }}>{getProfileLabel(user?.role)}</p>
           </div>
         </div>
         <button
           onClick={logout}
           data-testid="logout-button"
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-all"
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-all"
+          style={{ color: '#c0c0c0' }}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#2d3a4f'; e.currentTarget.style.color = '#fff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#c0c0c0'; }}
         >
           <LogOut className="w-4 h-4" />
           Sair

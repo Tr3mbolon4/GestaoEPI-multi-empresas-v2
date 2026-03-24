@@ -32,19 +32,26 @@ export const DashboardLayout = ({ children }) => {
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         {/* Mobile Header */}
-        <div className="lg:hidden sticky top-0 z-30 bg-slate-900 p-4 flex items-center justify-between">
+        <div className="lg:hidden sticky top-0 z-30 p-4 flex items-center justify-between" style={{ backgroundColor: '#1a1a1a' }}>
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-2 text-white hover:bg-slate-800 rounded-lg"
+            className="p-2 text-white rounded-lg transition-colors"
+            style={{ backgroundColor: 'transparent' }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2d3a4f'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             data-testid="mobile-menu-button"
           >
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-emerald-100 rounded-md flex items-center justify-center">
-              <span className="text-emerald-600 font-bold text-sm">GE</span>
+            <div className="w-8 h-8 rounded-md overflow-hidden shadow">
+              <img 
+                src="/logo-gestao-epi.jpg" 
+                alt="Gestão EPI" 
+                className="w-full h-full object-cover"
+              />
             </div>
-            <span className="text-white font-bold">GestorEPI</span>
+            <span className="text-white font-bold">Gestão EPI</span>
           </div>
           <div className="w-10"></div>
         </div>

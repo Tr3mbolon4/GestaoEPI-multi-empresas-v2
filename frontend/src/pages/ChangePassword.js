@@ -63,20 +63,20 @@ export default function ChangePassword() {
   const canSubmit = !passwordError && oldPassword && newPassword && confirmPassword && passwordsMatch;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8 bg-slate-50">
+    <div className="min-h-screen flex items-center justify-center p-8" style={{ backgroundColor: '#f3f4f6' }}>
       <div className="w-full max-w-md">
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-8">
+        <div className="bg-white rounded-lg shadow-sm p-8" style={{ border: '1px solid #e5e7eb' }}>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-emerald-500 rounded-md flex items-center justify-center">
+            <div className="w-12 h-12 rounded-md flex items-center justify-center" style={{ backgroundColor: '#2d3a4f' }}>
               <Lock className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Alterar Senha</h2>
+            <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#1a1a1a' }}>Alterar Senha</h2>
           </div>
-          <p className="text-sm text-slate-600 mb-6">Por segurança, altere sua senha no primeiro acesso.</p>
+          <p className="text-sm mb-6" style={{ color: '#6b7280' }}>Por segurança, altere sua senha no primeiro acesso.</p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#374151' }}>
                 Senha Atual
               </label>
               <input
@@ -84,13 +84,16 @@ export default function ChangePassword() {
                 data-testid="old-password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                className="flex h-10 w-full rounded-md bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{ border: '1px solid #d1d5db' }}
+                onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #2d3a4f40'}
+                onBlur={(e) => e.target.style.boxShadow = 'none'}
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#374151' }}>
                 Nova Senha
               </label>
               <input
@@ -98,14 +101,17 @@ export default function ChangePassword() {
                 data-testid="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                className="flex h-10 w-full rounded-md bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{ border: '1px solid #d1d5db' }}
+                onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #2d3a4f40'}
+                onBlur={(e) => e.target.style.boxShadow = 'none'}
                 required
                 minLength={8}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#374151' }}>
                 Confirmar Nova Senha
               </label>
               <input
@@ -113,21 +119,22 @@ export default function ChangePassword() {
                 data-testid="confirm-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  confirmPassword && !passwordsMatch 
-                    ? 'border-red-500 focus:ring-red-500' 
+                className="flex h-10 w-full rounded-md bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{ 
+                  border: confirmPassword && !passwordsMatch 
+                    ? '1px solid #ef4444' 
                     : passwordsMatch 
-                      ? 'border-emerald-500 focus:ring-emerald-500' 
-                      : 'border-slate-300 focus:ring-emerald-500'
-                }`}
+                      ? '1px solid #2d3a4f' 
+                      : '1px solid #d1d5db'
+                }}
+                onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #2d3a4f40'}
+                onBlur={(e) => e.target.style.boxShadow = 'none'}
                 required
                 minLength={8}
               />
               {/* Indicador visual de erro/sucesso - SEMPRE visível quando há conteúdo */}
               {confirmPassword && (
-                <div className={`flex items-center gap-1 mt-1.5 text-sm font-medium ${
-                  passwordsMatch ? 'text-emerald-600' : 'text-red-600'
-                }`}>
+                <div className="flex items-center gap-1 mt-1.5 text-sm font-medium" style={{ color: passwordsMatch ? '#2d3a4f' : '#ef4444' }}>
                   {passwordsMatch ? (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
@@ -155,7 +162,10 @@ export default function ChangePassword() {
               type="submit"
               data-testid="change-password-submit"
               disabled={loading || !canSubmit}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-sm rounded-md px-4 py-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full text-white font-medium shadow-sm rounded-md px-4 py-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              style={{ backgroundColor: '#2d3a4f' }}
+              onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = '#3d4a5f')}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2d3a4f'}
             >
               {loading ? (
                 <>
