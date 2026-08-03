@@ -8,7 +8,7 @@ from database import get_db
 from bson import ObjectId
 import os
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'gestorepi-secret-key-production-2026-emerald')
+SECRET_KEY = os.environ['SECRET_KEY']
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
