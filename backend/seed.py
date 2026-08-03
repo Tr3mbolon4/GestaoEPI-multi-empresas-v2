@@ -3,18 +3,11 @@ from auth import get_password_hash
 from datetime import datetime, timedelta, timezone
 import asyncio
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
 async def seed_database():
     db = await get_db()
-    super_admin_password = os.environ.get("SUPER_ADMIN_PASSWORD")
-    default_admin_password = os.environ.get("DEFAULT_ADMIN_PASSWORD")
-    if not super_admin_password:
-        raise RuntimeError("SUPER_ADMIN_PASSWORD deve ser definido no ambiente.")
-    if not default_admin_password:
-        raise RuntimeError("DEFAULT_ADMIN_PASSWORD deve ser definido no ambiente.")
     
     # ===================== SUPER_ADMIN (DONO DO SISTEMA) =====================
     existing_super = await db.users.find_one({"role": "super_admin"})
@@ -22,7 +15,7 @@ async def seed_database():
         super_admin = {
             "username": "superadmin",
             "email": "super@gestorepi.com",
-            "hashed_password": get_password_hash(super_admin_password),
+            "hashed_password": get_password_hash("Super@2026!"),
             "role": "super_admin",
             "is_primary_admin": True,
             "must_change_password": True,
@@ -33,7 +26,7 @@ async def seed_database():
             "updated_at": datetime.now(timezone.utc)
         }
         await db.users.insert_one(super_admin)
-        logger.info("SUPER_ADMIN criado a partir de variavel de ambiente.")
+        logger.info("✅ SUPER_ADMIN criado: superadmin / Super@2026!")
     else:
         logger.info("SUPER_ADMIN já existe")
     
@@ -61,7 +54,7 @@ async def seed_database():
         admin_demo = {
             "username": "admin",
             "email": "admin@demo.com",
-            "hashed_password": get_password_hash(default_admin_password),
+            "hashed_password": get_password_hash("Admin@2026!"),
             "role": "admin",
             "empresa_id": empresa_id,
             "is_primary_admin": False,
@@ -72,7 +65,7 @@ async def seed_database():
             "updated_at": datetime.now(timezone.utc)
         }
         await db.users.insert_one(admin_demo)
-        logger.info("Admin da empresa demo criado a partir de variavel de ambiente.")
+        logger.info(f"✅ Admin da empresa demo criado: admin / Admin@2026!")
         
         # Criar colaborador de teste vinculado à empresa
         existing_employee = await db.employees.find_one({"cpf": "000.000.000-00"})
@@ -129,11 +122,11 @@ async def seed_database():
     logger.info("=" * 50)
     logger.info("SUPER ADMIN (Painel Master):")
     logger.info("  Usuário: superadmin")
-    logger.info("  Senha: definida por SUPER_ADMIN_PASSWORD")
+    logger.info("  Senha: Super@2026!")
     logger.info("")
     logger.info("ADMIN EMPRESA DEMO:")
     logger.info("  Usuário: admin")
-    logger.info("  Senha: definida por DEFAULT_ADMIN_PASSWORD")
+    logger.info("  Senha: Admin@2026!")
     logger.info("=" * 50)
     logger.info("Seed concluído com sucesso")
 

@@ -1,0 +1,101 @@
+{
+  "metadata": {
+    "criado_em": "2026-03-24T11:32:23.274215+00:00",
+    "criado_por": "superadmin",
+    "descricao": null,
+    "versao": "1.0",
+    "colecoes": [
+      "empresas",
+      "users",
+      "employees",
+      "epis",
+      "kits",
+      "deliveries",
+      "suppliers",
+      "companies",
+      "facial_templates",
+      "stock_movements",
+      "historico_planos",
+      "biometric_consent_logs",
+      "ficha_authentications"
+    ]
+  },
+  "dados": {
+    "empresas": [
+      {
+        "_id": "69c271b2ec49a6afd0777fb8",
+        "nome": "Empresa Demonstração",
+        "cnpj": "00.000.000/0001-00",
+        "status": "ativo",
+        "plano": "150",
+        "limite_colaboradores": 150,
+        "endereco": "Rua Demonstração, 123 - Centro",
+        "telefone": "(11) 99999-9999",
+        "email": "contato@demo.com.br",
+        "responsavel": "Administrador Demo",
+        "created_at": "2026-03-24T11:12:50.038000",
+        "updated_at": "2026-03-24T11:12:50.038000"
+      }
+    ],
+    "users": [
+      {
+        "_id": "69c271b2ec49a6afd0777fb7",
+        "username": "superadmin",
+        "email": "super@gestorepi.com",
+        "hashed_password": "$2b$12$dJhF/gdJBOGX1pLsdio9U.RdVUHXik5U9ZJOo3oQyuep6Ehz6pfTe",
+        "role": "super_admin",
+        "is_primary_admin": true,
+        "must_change_password": true,
+        "is_active": true,
+        "empresa_id": null,
+        "password_changed_at": "2026-03-24T11:12:50.035000",
+        "created_at": "2026-03-24T11:12:50.035000",
+        "updated_at": "2026-03-24T11:12:50.035000"
+      },
+      {
+        "_id": "69c271b2ec49a6afd0777fb9",
+        "username": "admin",
+        "email": "admin@demo.com",
+        "hashed_password": "$2b$12$M8DzALB36zLgfnj8I1/uhe4SThi5I.rKlRA/PhQsrk0SoccZJ0zjC",
+        "role": "admin",
+        "empresa_id": "69c271b2ec49a6afd0777fb8",
+        "is_primary_admin": false,
+        "must_change_password": true,
+        "is_active": true,
+        "password_changed_at": "2026-03-24T11:12:50.533000",
+        "created_at": "2026-03-24T11:12:50.533000",
+        "updated_at": "2026-03-24T11:12:50.533000"
+      }
+    ],
+    "employees": [
+      {
+        "_id": "69c271b2ec49a6afd0777fba",
+        "full_name": "João da Silva (Demo)",
+        "cpf": "000.000.000-00",
+        "empresa_id": "69c271b2ec49a6afd0777fb8",
+        "employee_code": "FUNC001",
+        "admission_date": "2026-03-24",
+        "department": "Produção",
+        "position": "Operador de Máquinas",
+        "blood_type": "O+",
+        "contact_phone": "(11) 98765-4321",
+        "emergency_contact": "Maria da Silva - (11) 91234-5678",
+        "status": "active",
+        "facial_consent": true,
+        "notes": "Funcionário de demonstração",
+        "created_at": "2026-03-24T11:12:50.535000",
+        "updated_at": "2026-03-24T11:12:50.535000"
+      }
+    ],
+    "epis": [],
+    "kits": [],
+    "deliveries": [],
+    "suppliers": [],
+    "companies": [],
+    "facial_templates": [],
+    "stock_movements": [],
+    "historico_planos": [],
+    "biometric_consent_logs": [],
+    "ficha_authentications": []
+  }
+}

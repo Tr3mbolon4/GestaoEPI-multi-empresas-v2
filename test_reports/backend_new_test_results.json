@@ -1,0 +1,141 @@
+{
+  "total_tests": 22,
+  "passed_tests": 22,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "test_results": [
+    {
+      "name": "Login with superadmin",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.809054"
+    },
+    {
+      "name": "Get employee ID",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.812316"
+    },
+    {
+      "name": "LGPD Dashboard - all required fields",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.818383"
+    },
+    {
+      "name": "LGPD Consentimentos - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.822355"
+    },
+    {
+      "name": "Consent entry structure",
+      "success": true,
+      "details": "No consents to check (acceptable)",
+      "timestamp": "2026-03-24T12:29:20.822370"
+    },
+    {
+      "name": "LGPD Export Dados endpoint",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.831089"
+    },
+    {
+      "name": "Export contains personal data",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.831105"
+    },
+    {
+      "name": "Export contains biometric consents",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.831110"
+    },
+    {
+      "name": "Export contains EPI deliveries",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.831113"
+    },
+    {
+      "name": "Entregas por Período - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.835658"
+    },
+    {
+      "name": "Entregas data entry structure",
+      "success": true,
+      "details": "No data entries to check (acceptable)",
+      "timestamp": "2026-03-24T12:29:20.835673"
+    },
+    {
+      "name": "Consumo de EPIs - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.839515"
+    },
+    {
+      "name": "Estoque Crítico - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.843066"
+    },
+    {
+      "name": "Critical stock EPI structure",
+      "success": true,
+      "details": "No critical EPIs to check (acceptable)",
+      "timestamp": "2026-03-24T12:29:20.843084"
+    },
+    {
+      "name": "Vencimentos - structure correct",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.846808"
+    },
+    {
+      "name": "Expiring EPI structure",
+      "success": true,
+      "details": "No expiring EPIs to check (acceptable)",
+      "timestamp": "2026-03-24T12:29:20.846827"
+    },
+    {
+      "name": "Suppliers endpoint accessible",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.850011"
+    },
+    {
+      "name": "Suppliers contain proper identification",
+      "success": true,
+      "details": "No suppliers to check (acceptable)",
+      "timestamp": "2026-03-24T12:29:20.850023"
+    },
+    {
+      "name": "Dashboard Stats endpoint accessible",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.857611"
+    },
+    {
+      "name": "Dashboard Stats shows company-specific data",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.857626"
+    },
+    {
+      "name": "Stock Alerts endpoint accessible",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-03-24T12:29:20.860895"
+    },
+    {
+      "name": "Stock Alerts contain proper identification",
+      "success": true,
+      "details": "No alerts to check (acceptable)",
+      "timestamp": "2026-03-24T12:29:20.860905"
+    }
+  ],
+  "timestamp": "2026-03-24T12:29:20.860922"
+}
