@@ -27,7 +27,7 @@ O sistema foi criado para reduzir controles manuais de entrega de EPIs, centrali
 
 ### Funcionalidades Em Desenvolvimento
 
-- Ajustes e evolucoes de multiempresa aparecem em arquivos de teste e documentacao interna do projeto.
+- Ajustes e evolucoes de multiempresa aparecem em arquivos de teste e documentacao do projeto.
 - Melhorias de alertas, kits e exibicao de detalhes de EPIs aparecem em telas e testes do repositorio.
 
 ### Funcionalidades Planejadas
@@ -77,7 +77,7 @@ flowchart LR
 - `frontend/`: interface web, paginas, componentes e integracao com a API.
 - `backend/tests/`: testes automatizados relacionados a funcionalidades do backend.
 - `tests/`: estrutura auxiliar de testes.
-- `test_reports/` e `memory/`: artefatos internos existentes nesta versao historica.
+- `test_reports/` e `memory/`: artefatos de acompanhamento existentes nesta versao historica.
 
 ## Status
 
@@ -89,4 +89,4 @@ Projeto desenvolvido e organizado por Michele Santana, com foco em sistemas inte
 
 ## Autor
 
-Desenvolvido por Michele Santana -- Kalion Tecnologia
+Desenvolvido por Michele Santana — Kalion Tecnologia
