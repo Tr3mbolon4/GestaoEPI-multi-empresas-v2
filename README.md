@@ -85,8 +85,8 @@ Versao antiga / historica. A versao principal mais recente parece estar relacion
 
 ## Minha Participacao
 
-Projeto desenvolvido e organizado por Michele Santana, com foco em sistemas internos, automacao operacional e solucoes para gestao de EPIs.
+Projeto desenvolvido e organizado por Alexandre Santana dos Santos, com foco em sistemas internos, automacao operacional e solucoes para gestao de EPIs.
 
 ## Autor
 
-Desenvolvido por Michele Santana — Kalion Tecnologia
+Desenvolvido por Alexandre Santana dos Santos — Kalion Tecnologia
